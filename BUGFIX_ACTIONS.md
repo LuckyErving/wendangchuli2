@@ -19,7 +19,17 @@ This request has been automatically failed because it uses a deprecated version 
 | actions/setup-python | v4 | v5 | Python环境设置 |
 | actions/upload-artifact | v3 | v4 | 构建产物上传 |
 
-### 2. 优化PyInstaller配置
+### 2. 添加权限配置（修复403错误）
+
+在workflow中添加：
+```yaml
+permissions:
+  contents: write
+```
+
+这允许GitHub Actions创建Release和上传文件。
+
+### 3. 优化PyInstaller配置
 
 - 移除不存在的`--icon=icon.ico`参数
 - 添加更多隐藏导入：
@@ -27,7 +37,7 @@ This request has been automatically failed because it uses a deprecated version 
   - `qrcode`
   - `reportlab`
 
-### 3. 更新文档
+### 4. 更新文档
 
 - 更新 `GitHub_Actions指南.md`
 - 更新 `CHANGELOG.md`
