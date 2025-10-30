@@ -1,0 +1,5 @@
+qrcode[pil]
+reportlab
+Pillow
+oss2
+pyinstaller
