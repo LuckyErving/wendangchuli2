@@ -12,10 +12,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     
@@ -26,7 +26,7 @@ jobs:
     
     - name: Build with PyInstaller
       run: |
-        pyinstaller --name="文档处理工具" --onefile --windowed --icon=icon.ico main.py --add-data "oss_helper.py;." --hidden-import=oss2 --hidden-import=PIL._tkinter_finder
+        pyinstaller --name="文档处理工具" --onefile --windowed main.py --add-data "oss_helper.py;." --hidden-import=oss2 --hidden-import=PIL._tkinter_finder --hidden-import=PIL.Image --hidden-import=qrcode --hidden-import=reportlab
     
     - name: Create release archive
       run: |
@@ -37,7 +37,7 @@ jobs:
         copy 操作指南.md release\
     
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: windows-executable
         path: release/

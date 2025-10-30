@@ -28,8 +28,8 @@ git push origin v1.0.0
 
 GitHub Actions会自动执行以下步骤：
 
-1. **检出代码**：拉取最新代码
-2. **设置Python环境**：安装Python 3.9
+1. **检出代码**：拉取最新代码 (actions/checkout@v4)
+2. **设置Python环境**：安装Python 3.9 (actions/setup-python@v5)
 3. **安装依赖**：安装requirements.txt中的所有包
 4. **使用PyInstaller打包**：
    - 打包为单文件可执行程序
@@ -38,8 +38,10 @@ GitHub Actions会自动执行以下步骤：
 5. **创建发布包**：
    - 包含可执行文件
    - 包含文档文件
-6. **上传Artifact**：构建产物可供下载
+6. **上传Artifact**：构建产物可供下载 (actions/upload-artifact@v4)
 7. **创建Release**（仅Tag触发）：自动创建GitHub Release
+
+> **版本说明**：已更新所有Actions到最新版本以确保兼容性和安全性
 
 ## 下载构建产物
 
