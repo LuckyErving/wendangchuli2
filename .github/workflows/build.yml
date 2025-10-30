@@ -34,9 +34,6 @@ jobs:
       run: |
         mkdir release
         copy dist\wdcl2.exe release\
-        copy README.md release\
-        copy 快速开始.md release\
-        copy 操作指南.md release\
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -48,6 +45,24 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: release/*
+        files: release/wdcl2.exe
+        body: |
+          ## 文档处理工具 v${{ github.ref_name }}
+          
+          ### 下载说明
+          - 下载 `wdcl2.exe` 文件
+          - 双击运行即可使用
+          
+          ### 文档链接
+          - [README](https://github.com/${{ github.repository }}/blob/main/README.md)
+          - [快速开始](https://github.com/${{ github.repository }}/blob/main/快速开始.md)
+          - [操作指南](https://github.com/${{ github.repository }}/blob/main/操作指南.md)
+          - [OSS配置](https://github.com/${{ github.repository }}/blob/main/OSS配置指南.md)
+          
+          ### 功能特性
+          - ✅ 二维码和PDF生成
+          - ✅ 阿里云OSS集成
+          - ✅ 支持村/乡目录结构
+          - ✅ 批量处理
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
