@@ -9,12 +9,16 @@
   - actions/upload-artifact@v3 → v4
 - 🔧 添加workflow权限配置（修复403 Release创建失败）
   - 添加 `permissions: contents: write`
+- 🔧 修复Release文件上传404错误
+  - 使用通配符 `release/*` 代替逐个列出文件
+  - 解决中文文件名编码问题
 - 🔧 移除不存在的icon.ico引用
 - 🔧 添加更多PyInstaller隐藏导入以确保打包完整性
 
 ### 📝 文档更新
 - 更新GitHub_Actions指南.md，说明Actions版本
 - 更新BUGFIX_ACTIONS.md，添加权限配置说明
+- 创建FIX_403_ERROR.md，详细说明权限问题
 
 ---
 

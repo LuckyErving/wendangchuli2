@@ -28,12 +28,12 @@ jobs:
     
     - name: Build with PyInstaller
       run: |
-        pyinstaller --name="文档处理工具" --onefile --windowed main.py --add-data "oss_helper.py;." --hidden-import=oss2 --hidden-import=PIL._tkinter_finder --hidden-import=PIL.Image --hidden-import=qrcode --hidden-import=reportlab
+        pyinstaller --name="wdcl2" --onefile --windowed main.py --add-data "oss_helper.py;." --hidden-import=oss2 --hidden-import=PIL._tkinter_finder --hidden-import=PIL.Image --hidden-import=qrcode --hidden-import=reportlab
     
     - name: Create release archive
       run: |
         mkdir release
-        copy dist\文档处理工具.exe release\
+        copy dist\wdcl2.exe release\
         copy README.md release\
         copy 快速开始.md release\
         copy 操作指南.md release\
@@ -48,10 +48,6 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          release/文档处理工具.exe
-          release/README.md
-          release/快速开始.md
-          release/操作指南.md
+        files: release/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
