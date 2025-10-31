@@ -606,10 +606,23 @@ class DocumentProcessorApp:
         # 添加每张图片
         for file_info in uploaded_files:
             filename = os.path.basename(file_info['local_path'])
+            # URL编码，保留协议和域名部分的特殊字符
             url = file_info['url']
+            # 对URL中的路径部分进行编码（保留协议和斜杠）
+            if '://' in url:
+                protocol_end = url.index('://') + 3
+                domain_end = url.index('/', protocol_end)
+                protocol_domain = url[:domain_end]
+                path = url[domain_end:]
+                # 编码路径部分，但保留斜杠
+                encoded_path = quote(path, safe='/')
+                encoded_url = protocol_domain + encoded_path
+            else:
+                encoded_url = quote(url, safe=':/')
+            
             html_content += f"""
-            <div class="image-item" onclick="openLightbox('{url}')">
-                <img src="{url}" alt="{filename}" loading="lazy">
+            <div class="image-item" onclick="openLightbox('{encoded_url}')">
+                <img src="{encoded_url}" alt="{filename}" loading="lazy">
                 <div class="image-name">{filename}</div>
             </div>
 """
