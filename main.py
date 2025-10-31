@@ -13,7 +13,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext, simpledialog
 import qrcode
 from PIL import Image
-from reportlab.lib.pagesizes import A3, A4, A5
+from reportlab.lib.pagesizes import A3, A4, A5, landscape
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 import threading
@@ -218,6 +218,14 @@ class DocumentProcessorApp:
         page_size_combo.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
         page_size_combo.bind("<<ComboboxSelected>>", self.on_page_size_change)
         
+        # 页面方向
+        ttk.Label(pdf_frame, text="页面方向:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.page_orientation_var = tk.StringVar(value="纵向")
+        orientation_frame = ttk.Frame(pdf_frame)
+        orientation_frame.grid(row=1, column=1, sticky=tk.W, pady=5)
+        ttk.Radiobutton(orientation_frame, text="纵向", variable=self.page_orientation_var, value="纵向").pack(side=tk.LEFT, padx=5)
+        ttk.Radiobutton(orientation_frame, text="横向", variable=self.page_orientation_var, value="横向").pack(side=tk.LEFT, padx=5)
+        
         # 自定义尺寸
         self.custom_size_frame = ttk.Frame(pdf_frame)
         self.custom_size_frame.grid(row=0, column=2, columnspan=4, sticky=tk.W, padx=5, pady=5)
@@ -333,16 +341,25 @@ class DocumentProcessorApp:
     def get_page_size(self):
         """获取页面尺寸"""
         page_size_name = self.page_size_var.get()
+        orientation = self.page_orientation_var.get()
+        
         if page_size_name == "自定义":
             try:
                 width = float(self.custom_width_var.get()) * mm
                 height = float(self.custom_height_var.get()) * mm
+                # 应用方向
+                if orientation == "横向":
+                    width, height = height, width
                 return (width, height)
             except ValueError:
                 messagebox.showerror("错误", "自定义尺寸必须是数字")
                 return None
         else:
-            return self.page_sizes[page_size_name]
+            page_size = self.page_sizes[page_size_name]
+            # 应用方向
+            if orientation == "横向":
+                page_size = landscape(page_size)
+            return page_size
     
     def get_target_directories(self, root_dir, dir_type):
         """
@@ -460,12 +477,13 @@ class DocumentProcessorApp:
             self.log(f"创建PDF失败: {str(e)}")
             return False
     
-    def upload_directory_to_oss(self, directory):
+    def upload_directory_to_oss(self, directory, root_dir=None):
         """
         上传目录到OSS
         
         Args:
             directory: 目录路径
+            root_dir: 根目录路径（用于构建完整路径结构）
             
         Returns:
             (成功, OSS URL前缀)
@@ -474,7 +492,13 @@ class DocumentProcessorApp:
             self.log("  OSS未配置，跳过上传")
             return False, None
         
-        dir_name = os.path.basename(directory)
+        # 构建OSS路径：包含根目录名称和子目录名称
+        if root_dir:
+            root_name = os.path.basename(root_dir)
+            dir_name = os.path.basename(directory)
+            oss_dir_prefix = f"{root_name}/{dir_name}"
+        else:
+            oss_dir_prefix = os.path.basename(directory)
         
         def upload_callback(file_path, success, result):
             if success:
@@ -484,7 +508,7 @@ class DocumentProcessorApp:
         
         self.log(f"  开始上传图片到OSS...")
         success_count, fail_count, uploaded_files = self.oss_uploader.upload_directory(
-            directory, dir_name, callback=upload_callback
+            directory, oss_dir_prefix, callback=upload_callback
         )
         
         self.log(f"  上传完成: 成功 {success_count} 个, 失败 {fail_count} 个")
@@ -499,7 +523,7 @@ class DocumentProcessorApp:
         
         return False, None
     
-    def process_directory(self, directory, page_size, qr_size_mm, x_mm, y_mm, auto_upload=False):
+    def process_directory(self, directory, page_size, qr_size_mm, x_mm, y_mm, auto_upload=False, root_dir=None):
         """
         处理单个目录：上传图片、生成二维码和PDF
         
@@ -510,6 +534,7 @@ class DocumentProcessorApp:
             x_mm: 二维码X坐标
             y_mm: 二维码Y坐标
             auto_upload: 是否自动上传
+            root_dir: 根目录路径（用于构建OSS路径）
         """
         dir_name = os.path.basename(directory)
         self.log(f"处理目录: {dir_name}")
@@ -525,7 +550,7 @@ class DocumentProcessorApp:
         # 如果启用自动上传，先上传图片到OSS
         oss_url = None
         if auto_upload:
-            success, oss_url = self.upload_directory_to_oss(directory)
+            success, oss_url = self.upload_directory_to_oss(directory, root_dir)
             if not success:
                 self.log(f"  警告：上传失败，将使用默认URL生成二维码")
         
@@ -534,10 +559,18 @@ class DocumentProcessorApp:
             # 构建默认OSS URL
             if self.oss_config.is_valid():
                 endpoint_without_protocol = self.oss_config.endpoint.replace('http://', '').replace('https://', '')
-                if self.oss_config.base_path:
-                    oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{self.oss_config.base_path.strip('/')}/{dir_name}"
+                # 构建完整路径：base_path/root_name/dir_name
+                if root_dir:
+                    root_name = os.path.basename(root_dir)
+                    if self.oss_config.base_path:
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{self.oss_config.base_path.strip('/')}/{root_name}/{dir_name}"
+                    else:
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{root_name}/{dir_name}"
                 else:
-                    oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{dir_name}"
+                    if self.oss_config.base_path:
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{self.oss_config.base_path.strip('/')}/{dir_name}"
+                    else:
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{dir_name}"
             else:
                 oss_url = f"https://your-bucket.oss-region.aliyuncs.com/{dir_name}"
         
@@ -643,7 +676,7 @@ class DocumentProcessorApp:
                     self.log("")
                     continue
                 
-                success, oss_url = self.upload_directory_to_oss(target_dir)
+                success, oss_url = self.upload_directory_to_oss(target_dir, root_dir)
                 if success:
                     total_success += 1
                 else:
@@ -695,7 +728,7 @@ class DocumentProcessorApp:
             # 处理每个目录
             success_count = 0
             for target_dir in target_dirs:
-                self.process_directory(target_dir, page_size, qr_size_mm, x_mm, y_mm, auto_upload)
+                self.process_directory(target_dir, page_size, qr_size_mm, x_mm, y_mm, auto_upload, root_dir)
                 success_count += 1
                 self.log("")
             
