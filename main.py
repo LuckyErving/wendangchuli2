@@ -783,6 +783,16 @@ class DocumentProcessorApp:
             else:
                 oss_url = f"https://your-bucket.oss-region.aliyuncs.com/{quote(dir_name, safe='')}/index.html"
         
+        # 对URL进行编码（如果包含中文字符）
+        # 注意：只编码路径部分，不编码协议和域名
+        if oss_url and '://' in oss_url:
+            protocol, rest = oss_url.split('://', 1)
+            if '/' in rest:
+                domain, path = rest.split('/', 1)
+                # 对路径进行URL编码，但保留斜杠
+                encoded_path = quote(path, safe='/')
+                oss_url = f"{protocol}://{domain}/{encoded_path}"
+        
         # 生成二维码
         qr_filename = f"{dir_name}_qr.png"
         qr_path = os.path.join(directory, qr_filename)
