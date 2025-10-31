@@ -751,24 +751,35 @@ class DocumentProcessorApp:
             # 构建默认OSS URL
             if self.oss_config.is_valid():
                 endpoint_without_protocol = self.oss_config.endpoint.replace('http://', '').replace('https://', '')
-                # 构建完整路径：base_path/root_name/dir_name/index.html（URL编码中文）
+                
+                # 构建OSS路径（与upload_directory_to_oss保持一致）
                 if root_dir:
                     root_name = os.path.basename(root_dir)
-                    # URL编码路径中的中文字符
-                    encoded_root = quote(root_name, safe='')
-                    encoded_dir = quote(dir_name, safe='')
-                    if self.oss_config.base_path:
-                        encoded_base = quote(self.oss_config.base_path.strip('/'), safe='')
-                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_base}/{encoded_root}/{encoded_dir}/index.html"
+                    # 计算相对路径
+                    if directory.startswith(root_dir):
+                        rel_path = os.path.relpath(directory, root_dir)
+                        if rel_path == '.':
+                            # directory就是root_dir，只使用root_name
+                            oss_path = root_name
+                        else:
+                            # directory是root_dir的子目录
+                            oss_path = f"{root_name}/{rel_path}"
                     else:
-                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_root}/{encoded_dir}/index.html"
+                        # 不在root_dir下，使用directory的basename
+                        oss_path = dir_name
                 else:
-                    encoded_dir = quote(dir_name, safe='')
-                    if self.oss_config.base_path:
-                        encoded_base = quote(self.oss_config.base_path.strip('/'), safe='')
-                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_base}/{encoded_dir}/index.html"
-                    else:
-                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_dir}/index.html"
+                    # 没有root_dir，只使用dir_name
+                    oss_path = dir_name
+                
+                # URL编码路径
+                encoded_path = quote(oss_path, safe='')
+                
+                # 构建完整URL
+                if self.oss_config.base_path:
+                    encoded_base = quote(self.oss_config.base_path.strip('/'), safe='')
+                    oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_base}/{encoded_path}/index.html"
+                else:
+                    oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_path}/index.html"
             else:
                 oss_url = f"https://your-bucket.oss-region.aliyuncs.com/{quote(dir_name, safe='')}/index.html"
         
