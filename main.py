@@ -477,6 +477,181 @@ class DocumentProcessorApp:
             self.log(f"创建PDF失败: {str(e)}")
             return False
     
+    def generate_index_html(self, directory, uploaded_files, dir_name):
+        """
+        生成索引HTML文件，用于在浏览器中查看图片列表
+        
+        Args:
+            directory: 本地目录路径
+            uploaded_files: 已上传的文件列表
+            dir_name: 目录名称
+            
+        Returns:
+            index.html文件路径
+        """
+        html_content = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{dir_name} - 图片浏览</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }}
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 30px;
+        }}
+        h1 {{
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }}
+        .info {{
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }}
+        .gallery {{
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }}
+        .image-item {{
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }}
+        .image-item:hover {{
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }}
+        .image-item img {{
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+        }}
+        .image-name {{
+            padding: 12px;
+            font-size: 14px;
+            color: #333;
+            text-align: center;
+            word-break: break-all;
+        }}
+        .lightbox {{
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }}
+        .lightbox.active {{
+            display: flex;
+        }}
+        .lightbox img {{
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+        }}
+        .lightbox-close {{
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            z-index: 1001;
+        }}
+        @media (max-width: 768px) {{
+            .gallery {{
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 10px;
+            }}
+            .container {{
+                padding: 15px;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📁 {dir_name}</h1>
+        <div class="info">共 {len(uploaded_files)} 张图片</div>
+        <div class="gallery">
+"""
+        
+        # 添加每张图片
+        for file_info in uploaded_files:
+            filename = os.path.basename(file_info['local_path'])
+            url = file_info['url']
+            html_content += f"""
+            <div class="image-item" onclick="openLightbox('{url}')">
+                <img src="{url}" alt="{filename}" loading="lazy">
+                <div class="image-name">{filename}</div>
+            </div>
+"""
+        
+        html_content += """
+        </div>
+    </div>
+    
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+        <span class="lightbox-close">&times;</span>
+        <img id="lightbox-img" src="" alt="">
+    </div>
+    
+    <script>
+        function openLightbox(url) {
+            document.getElementById('lightbox').classList.add('active');
+            document.getElementById('lightbox-img').src = url;
+        }
+        
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+        }
+        
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeLightbox();
+            }
+        });
+    </script>
+</body>
+</html>
+"""
+        
+        # 保存HTML文件
+        index_path = os.path.join(directory, 'index.html')
+        try:
+            with open(index_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            return index_path
+        except Exception as e:
+            self.log(f"  生成index.html失败: {str(e)}")
+            return None
+    
     def upload_directory_to_oss(self, directory, root_dir=None):
         """
         上传目录到OSS
@@ -499,6 +674,7 @@ class DocumentProcessorApp:
             oss_dir_prefix = f"{root_name}/{dir_name}"
         else:
             oss_dir_prefix = os.path.basename(directory)
+            dir_name = oss_dir_prefix
         
         def upload_callback(file_path, success, result):
             if success:
@@ -515,9 +691,24 @@ class DocumentProcessorApp:
         
         # 构建OSS URL前缀
         if uploaded_files:
-            # 从第一个文件的URL中提取前缀
+            # 生成index.html
+            self.log(f"  生成图片浏览页面...")
+            index_path = self.generate_index_html(directory, uploaded_files, dir_name)
+            
+            if index_path:
+                # 上传index.html到OSS
+                index_oss_path = f"{oss_dir_prefix}/index.html"
+                success, result = self.oss_uploader.upload_file(index_path, index_oss_path)
+                
+                if success:
+                    self.log(f"    ✓ 已上传: index.html")
+                    # 返回index.html的URL
+                    return True, result
+                else:
+                    self.log(f"    ✗ 上传index.html失败: {result}")
+            
+            # 如果index.html上传失败，返回目录URL
             first_url = uploaded_files[0]['url']
-            # 移除文件名部分
             oss_url_prefix = first_url.rsplit('/', 1)[0]
             return True, oss_url_prefix
         

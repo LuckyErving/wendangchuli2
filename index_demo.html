@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>何皂皂 - 图片浏览</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .info {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .image-item {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .image-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .image-item img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+        }
+        .image-name {
+            padding: 12px;
+            font-size: 14px;
+            color: #333;
+            text-align: center;
+            word-break: break-all;
+        }
+        .lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .lightbox.active {
+            display: flex;
+        }
+        .lightbox img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+        }
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            z-index: 1001;
+        }
+        @media (max-width: 768px) {
+            .gallery {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 10px;
+            }
+            .container {
+                padding: 15px;
+            }
+        }
+        /* 演示用的占位图片 */
+        .demo-img {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📁 何皂皂</h1>
+        <div class="info">共 6 张图片 (演示)</div>
+        <div class="gallery">
+            
+            <div class="image-item" onclick="openLightbox('https://via.placeholder.com/800x600/667eea/ffffff?text=Image+1')">
+                <div class="demo-img" style="height: 200px;">图片 1</div>
+                <div class="image-name">IMG_001.jpg</div>
+            </div>
+
+            <div class="image-item" onclick="openLightbox('https://via.placeholder.com/800x600/764ba2/ffffff?text=Image+2')">
+                <div class="demo-img" style="height: 200px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">图片 2</div>
+                <div class="image-name">IMG_002.jpg</div>
+            </div>
+
+            <div class="image-item" onclick="openLightbox('https://via.placeholder.com/800x600/4facfe/ffffff?text=Image+3')">
+                <div class="demo-img" style="height: 200px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">图片 3</div>
+                <div class="image-name">IMG_003.jpg</div>
+            </div>
+
+            <div class="image-item" onclick="openLightbox('https://via.placeholder.com/800x600/43e97b/ffffff?text=Image+4')">
+                <div class="demo-img" style="height: 200px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">图片 4</div>
+                <div class="image-name">IMG_004.jpg</div>
+            </div>
+
+            <div class="image-item" onclick="openLightbox('https://via.placeholder.com/800x600/fa709a/ffffff?text=Image+5')">
+                <div class="demo-img" style="height: 200px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">图片 5</div>
+                <div class="image-name">IMG_005.jpg</div>
+            </div>
+
+            <div class="image-item" onclick="openLightbox('https://via.placeholder.com/800x600/30cfd0/ffffff?text=Image+6')">
+                <div class="demo-img" style="height: 200px; background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">图片 6</div>
+                <div class="image-name">IMG_006.jpg</div>
+            </div>
+
+        </div>
+    </div>
+    
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+        <span class="lightbox-close">&times;</span>
+        <img id="lightbox-img" src="" alt="">
+    </div>
+    
+    <script>
+        function openLightbox(url) {
+            document.getElementById('lightbox').classList.add('active');
+            document.getElementById('lightbox-img').src = url;
+        }
+        
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+        }
+        
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeLightbox();
+            }
+        });
+    </script>
+</body>
+</html>
