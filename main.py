@@ -17,6 +17,7 @@ from reportlab.lib.pagesizes import A3, A4, A5, landscape
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 import threading
+from urllib.parse import quote
 from oss_helper import OSSConfig, OSSUploader
 
 
@@ -750,20 +751,26 @@ class DocumentProcessorApp:
             # 构建默认OSS URL
             if self.oss_config.is_valid():
                 endpoint_without_protocol = self.oss_config.endpoint.replace('http://', '').replace('https://', '')
-                # 构建完整路径：base_path/root_name/dir_name
+                # 构建完整路径：base_path/root_name/dir_name/index.html（URL编码中文）
                 if root_dir:
                     root_name = os.path.basename(root_dir)
+                    # URL编码路径中的中文字符
+                    encoded_root = quote(root_name, safe='')
+                    encoded_dir = quote(dir_name, safe='')
                     if self.oss_config.base_path:
-                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{self.oss_config.base_path.strip('/')}/{root_name}/{dir_name}"
+                        encoded_base = quote(self.oss_config.base_path.strip('/'), safe='')
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_base}/{encoded_root}/{encoded_dir}/index.html"
                     else:
-                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{root_name}/{dir_name}"
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_root}/{encoded_dir}/index.html"
                 else:
+                    encoded_dir = quote(dir_name, safe='')
                     if self.oss_config.base_path:
-                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{self.oss_config.base_path.strip('/')}/{dir_name}"
+                        encoded_base = quote(self.oss_config.base_path.strip('/'), safe='')
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_base}/{encoded_dir}/index.html"
                     else:
-                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{dir_name}"
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_dir}/index.html"
             else:
-                oss_url = f"https://your-bucket.oss-region.aliyuncs.com/{dir_name}"
+                oss_url = f"https://your-bucket.oss-region.aliyuncs.com/{quote(dir_name, safe='')}/index.html"
         
         # 生成二维码
         qr_filename = f"{dir_name}_qr.png"
