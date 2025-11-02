@@ -420,7 +420,7 @@ class DocumentProcessorApp:
     
     def merge_images_horizontally(self, image_paths, output_path):
         """
-        将多张图片垂直拼接成一张大图（上下排列）
+        将多张图片垂直拼接成一张大图（上下排列），确保每张图片的长边朝下
         
         Args:
             image_paths: 图片路径列表
@@ -433,8 +433,14 @@ class DocumentProcessorApp:
             if not image_paths:
                 return False
             
-            # 打开所有图片
-            images = [Image.open(img_path) for img_path in image_paths]
+            # 打开所有图片并旋转（确保长边朝下）
+            images = []
+            for img_path in image_paths:
+                img = Image.open(img_path)
+                # 如果宽度大于高度（横向图片），则旋转90度
+                if img.width > img.height:
+                    img = img.rotate(90, expand=True)
+                images.append(img)
             
             # 计算拼接后的尺寸
             # 宽度取所有图片中的最大宽度
