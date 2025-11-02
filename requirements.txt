@@ -3,3 +3,4 @@ reportlab
 Pillow
 oss2
 pyinstaller
+pypinyin

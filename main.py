@@ -17,8 +17,56 @@ from reportlab.lib.pagesizes import A3, A4, A5, landscape
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 import threading
-from urllib.parse import quote
+import re
+import shutil
+from pypinyin import lazy_pinyin, Style
 from oss_helper import OSSConfig, OSSUploader
+
+
+def chinese_to_pinyin_initials(text):
+    """
+    将中文转换为拼音首字母，保留英文、数字和部分符号
+    使用pypinyin库自动转换所有中文字符
+    
+    Args:
+        text: 输入文本
+        
+    Returns:
+        转换后的文本
+    """
+    result = []
+    for char in text:
+        if '\u4e00' <= char <= '\u9fff':  # 中文字符
+            # 使用pypinyin获取首字母
+            pinyin = lazy_pinyin(char, style=Style.FIRST_LETTER)
+            if pinyin:
+                result.append(pinyin[0].lower())
+            else:
+                result.append('x')  # 后备方案
+        elif char.isalnum() or char in '-_.':
+            # 保留英文、数字和常用符号
+            result.append(char)
+        elif char in ' ()（）':
+            # 空格和括号转换为下划线
+            result.append('_')
+        # 其他字符忽略
+    
+    return ''.join(result)
+
+
+def convert_path_to_pinyin(path):
+    """
+    将路径中的中文部分转换为拼音首字母
+    
+    Args:
+        path: 文件路径
+        
+    Returns:
+        转换后的路径
+    """
+    parts = path.split('/')
+    converted_parts = [chinese_to_pinyin_initials(part) for part in parts]
+    return '/'.join(converted_parts)
 
 
 class OSSConfigDialog(tk.Toplevel):
@@ -766,23 +814,12 @@ class DocumentProcessorApp:
         # 添加每张图片
         for file_info in uploaded_files:
             filename = os.path.basename(file_info['local_path'])
-            # URL编码，保留协议和域名部分的特殊字符
+            # 直接使用URL，不进行编码（URL中的中文已转换为拼音首字母）
             url = file_info['url']
-            # 对URL中的路径部分进行编码（保留协议和斜杠）
-            if '://' in url:
-                protocol_end = url.index('://') + 3
-                domain_end = url.index('/', protocol_end)
-                protocol_domain = url[:domain_end]
-                path = url[domain_end:]
-                # 编码路径部分，但保留斜杠
-                encoded_path = quote(path, safe='/')
-                encoded_url = protocol_domain + encoded_path
-            else:
-                encoded_url = quote(url, safe=':/')
             
             html_content += f"""
-            <div class="image-item" onclick="openLightbox('{encoded_url}')">
-                <img src="{encoded_url}" alt="{filename}" loading="lazy">
+            <div class="image-item" onclick="openLightbox('{url}')">
+                <img src="{url}" alt="{filename}" loading="lazy">
                 <div class="image-name">{filename}</div>
             </div>
 """
@@ -842,7 +879,7 @@ class DocumentProcessorApp:
             self.log("  OSS未配置，跳过上传")
             return False, None
         
-        # 构建OSS路径：包含根目录名称和子目录名称
+        # 构建OSS路径：包含根目录名称和子目录名称，并转换为拼音首字母
         if root_dir:
             root_name = os.path.basename(root_dir)
             dir_name = os.path.basename(directory)
@@ -851,8 +888,11 @@ class DocumentProcessorApp:
             dir_name = os.path.basename(directory)
             oss_path = f"{dir_name}/{os.path.basename(merged_image_path)}"
         
+        # 将OSS路径中的中文转换为拼音首字母
+        pinyin_oss_path = convert_path_to_pinyin(oss_path)
+        
         self.log(f"  开始上传合并图片到OSS...")
-        success, result = self.oss_uploader.upload_file(merged_image_path, oss_path)
+        success, result = self.oss_uploader.upload_file(merged_image_path, pinyin_oss_path)
         
         if success:
             self.log(f"    ✓ 已上传: {os.path.basename(merged_image_path)}")
@@ -980,27 +1020,17 @@ class DocumentProcessorApp:
                     else:
                         oss_path = f"{dir_name}/{merged_filename}"
                     
-                    # URL编码路径
-                    encoded_path = quote(oss_path, safe='/')
+                    # 将路径中的中文转换为拼音首字母
+                    pinyin_path = convert_path_to_pinyin(oss_path)
                     
                     # 构建完整URL
                     if self.oss_config.base_path:
-                        encoded_base = quote(self.oss_config.base_path.strip('/'), safe='')
-                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_base}/{encoded_path}"
+                        pinyin_base = convert_path_to_pinyin(self.oss_config.base_path.strip('/'))
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{pinyin_base}/{pinyin_path}"
                     else:
-                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_path}"
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{pinyin_path}"
                 else:
                     return False, "OSS未配置"
-            
-            # 对URL进行编码（如果包含中文字符）
-            # 注意：只编码路径部分，不编码协议和域名
-            if oss_url and '://' in oss_url:
-                protocol, rest = oss_url.split('://', 1)
-                if '/' in rest:
-                    domain, path = rest.split('/', 1)
-                    # 对路径进行URL编码，但保留斜杠
-                    encoded_path = quote(path, safe='/')
-                    oss_url = f"{protocol}://{domain}/{encoded_path}"
             
             # 生成二维码
             qr_filename = f"{dir_prefix}_qr.png"
