@@ -51,15 +51,15 @@ class OSSConfigDialog(tk.Toplevel):
         # Access Key Secret
         ttk.Label(main_frame, text="Access Key Secret:").grid(row=1, column=0, sticky=tk.W, pady=5)
         self.access_key_secret_var = tk.StringVar()
-        ttk.Entry(main_frame, textvariable=self.access_key_secret_var, width=50, show="*").grid(row=1, column=1, pady=5)
+        ttk.Entry(main_frame, textvariable=self.access_key_secret_var, width=50, show="-").grid(row=1, column=1, pady=5)
         
         # Endpoint
         ttk.Label(main_frame, text="Endpoint:").grid(row=2, column=0, sticky=tk.W, pady=5)
         self.endpoint_var = tk.StringVar()
         entry_endpoint = ttk.Entry(main_frame, textvariable=self.endpoint_var, width=50)
         entry_endpoint.grid(row=2, column=1, pady=5)
-        ttk.Label(main_frame, text="例: oss-cn-beijing.aliyuncs.com", 
-                 foreground="gray").grid(row=3, column=1, sticky=tk.W)
+        # ttk.Label(main_frame, text="例: oss-cn-beijing.aliyuncs.com", 
+                #  foreground="gray").grid(row=3, column=1, sticky=tk.W)
         
         # Bucket Name
         ttk.Label(main_frame, text="Bucket Name:").grid(row=4, column=0, sticky=tk.W, pady=5)
@@ -71,8 +71,8 @@ class OSSConfigDialog(tk.Toplevel):
         self.base_path_var = tk.StringVar()
         entry_base_path = ttk.Entry(main_frame, textvariable=self.base_path_var, width=50)
         entry_base_path.grid(row=5, column=1, pady=5)
-        ttk.Label(main_frame, text="例: documents/xigou (可选)", 
-                 foreground="gray").grid(row=6, column=1, sticky=tk.W)
+        # ttk.Label(main_frame, text="", 
+                #  foreground="gray").grid(row=6, column=1, sticky=tk.W)
         
         # 按钮
         button_frame = ttk.Frame(main_frame)
@@ -82,17 +82,17 @@ class OSSConfigDialog(tk.Toplevel):
         ttk.Button(button_frame, text="保存", command=self.save_config).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="取消", command=self.cancel).pack(side=tk.LEFT, padx=5)
         
-        # 说明
-        info_frame = ttk.LabelFrame(main_frame, text="说明", padding="10")
-        info_frame.grid(row=8, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+#         # 说明
+#         info_frame = ttk.LabelFrame(main_frame, text="说明", padding="10")
+#         info_frame.grid(row=8, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
         
-        info_text = """
-• Access Key可在阿里云控制台获取
-• Endpoint格式: oss-cn-<region>.aliyuncs.com
-• 配置将保存在本地文件中
-• 基础路径为OSS中的目录前缀，可以为空
-        """
-        ttk.Label(info_frame, text=info_text, justify=tk.LEFT).pack()
+#         info_text = """
+# • Access Key可在阿里云控制台获取
+# • Endpoint格式: oss-cn-<region>.aliyuncs.com
+# • 配置将保存在本地文件中
+# • 基础路径为OSS中的目录前缀，可以为空
+#         """
+#         ttk.Label(info_frame, text=info_text, justify=tk.LEFT).pack()
         
     def load_config(self):
         """加载配置"""
@@ -145,7 +145,7 @@ class DocumentProcessorApp:
     
     def __init__(self, root):
         self.root = root
-        self.root.title("文档处理工具 - 二维码、PDF与OSS管理器")
+        self.root.title("文档处理工具V2.0")
         self.root.geometry("950x750")
         
         # 页面尺寸映射
@@ -178,20 +178,27 @@ class DocumentProcessorApp:
         
         ttk.Label(dir_frame, text="根目录:").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.root_dir_var = tk.StringVar()
+        # 监听路径变化
+        self.root_dir_var.trace_add('write', self.on_directory_changed)
         ttk.Entry(dir_frame, textvariable=self.root_dir_var, width=50).grid(row=0, column=1, padx=5, pady=5)
         ttk.Button(dir_frame, text="浏览...", command=self.browse_directory).grid(row=0, column=2, padx=5, pady=5)
         
-        # 目录结构类型
+        # 目录结构类型（自动检测）
         ttk.Label(dir_frame, text="目录结构:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.dir_type_var = tk.StringVar(value="村")
-        dir_type_frame = ttk.Frame(dir_frame)
-        dir_type_frame.grid(row=1, column=1, sticky=tk.W, pady=5)
-        ttk.Radiobutton(dir_type_frame, text="村（二级目录）", variable=self.dir_type_var, value="村").pack(side=tk.LEFT, padx=10)
-        ttk.Radiobutton(dir_type_frame, text="乡（三级目录）", variable=self.dir_type_var, value="乡").pack(side=tk.LEFT, padx=10)
+        self.dir_type_var = tk.StringVar(value="未检测")
+        self.dir_type_label = ttk.Label(dir_frame, textvariable=self.dir_type_var, foreground="blue")
+        self.dir_type_label.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
+        # ttk.Label(dir_frame, text="（自动检测）", foreground="gray").grid(row=1, column=2, sticky=tk.W, pady=5)
+        
+        # 创建横向容器放置OSS和PDF设置
+        settings_container = ttk.Frame(main_frame)
+        settings_container.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        settings_container.columnconfigure(0, weight=1)
+        settings_container.columnconfigure(1, weight=1)
         
         # OSS设置
-        oss_frame = ttk.LabelFrame(main_frame, text="OSS设置", padding="10")
-        oss_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        oss_frame = ttk.LabelFrame(settings_container, text="OSS设置", padding="10")
+        oss_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
         
         oss_button_frame = ttk.Frame(oss_frame)
         oss_button_frame.grid(row=0, column=0, sticky=tk.W)
@@ -203,17 +210,17 @@ class DocumentProcessorApp:
         ttk.Label(oss_button_frame, textvariable=self.oss_status_var).pack(side=tk.LEFT, padx=10)
         
         # 上传选项
-        self.auto_upload_var = tk.BooleanVar(value=False)
+        self.auto_upload_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(oss_frame, text="生成二维码后自动上传图片到OSS", 
                        variable=self.auto_upload_var).grid(row=1, column=0, sticky=tk.W, pady=5)
         
         # PDF设置
-        pdf_frame = ttk.LabelFrame(main_frame, text="PDF设置", padding="10")
-        pdf_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        pdf_frame = ttk.LabelFrame(settings_container, text="PDF设置", padding="10")
+        pdf_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(5, 0))
         
         # 页面尺寸
         ttk.Label(pdf_frame, text="页面尺寸:").grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.page_size_var = tk.StringVar(value="A4")
+        self.page_size_var = tk.StringVar(value="自定义")
         page_size_combo = ttk.Combobox(pdf_frame, textvariable=self.page_size_var, 
                                        values=list(self.page_sizes.keys()), state="readonly", width=15)
         page_size_combo.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
@@ -232,22 +239,22 @@ class DocumentProcessorApp:
         self.custom_size_frame.grid(row=0, column=2, columnspan=4, sticky=tk.W, padx=5, pady=5)
         
         ttk.Label(self.custom_size_frame, text="宽度(mm):").pack(side=tk.LEFT, padx=2)
-        self.custom_width_var = tk.StringVar(value="210")
+        self.custom_width_var = tk.StringVar(value="325")
         ttk.Entry(self.custom_size_frame, textvariable=self.custom_width_var, width=8).pack(side=tk.LEFT, padx=2)
         
         ttk.Label(self.custom_size_frame, text="高度(mm):").pack(side=tk.LEFT, padx=2)
-        self.custom_height_var = tk.StringVar(value="297")
+        self.custom_height_var = tk.StringVar(value="238")
         ttk.Entry(self.custom_size_frame, textvariable=self.custom_height_var, width=8).pack(side=tk.LEFT, padx=2)
         
-        self.custom_size_frame.grid_remove()  # 初始隐藏
+        # 默认显示自定义尺寸框（不隐藏）
         
         # 二维码设置
         qr_frame = ttk.LabelFrame(main_frame, text="二维码设置", padding="10")
-        qr_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        qr_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
         
         # 二维码大小
         ttk.Label(qr_frame, text="二维码大小(mm):").grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.qr_size_var = tk.StringVar(value="50")
+        self.qr_size_var = tk.StringVar(value="20")
         ttk.Entry(qr_frame, textvariable=self.qr_size_var, width=10).grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
         
         # 二维码位置
@@ -259,24 +266,21 @@ class DocumentProcessorApp:
         self.qr_y_var = tk.StringVar(value="10")
         ttk.Entry(qr_frame, textvariable=self.qr_y_var, width=10).grid(row=1, column=3, sticky=tk.W, padx=5, pady=5)
         
-        ttk.Label(qr_frame, text="注：坐标为二维码左上角位置，从页面左下角开始计算", 
+        ttk.Label(qr_frame, text="注：坐标为二维码左下角位置，从页面左下角开始计算", 
                  foreground="blue").grid(row=2, column=0, columnspan=4, sticky=tk.W, pady=5)
         
         # 操作按钮
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=4, column=0, columnspan=2, pady=15)
+        button_frame.grid(row=3, column=0, columnspan=2, pady=15)
         
-        self.start_button = ttk.Button(button_frame, text="开始生成", command=self.start_processing, width=15)
+        self.start_button = ttk.Button(button_frame, text="开始处理", command=self.start_processing, width=15)
         self.start_button.pack(side=tk.LEFT, padx=5)
-        
-        self.upload_button = ttk.Button(button_frame, text="仅上传到OSS", command=self.upload_only, width=15)
-        self.upload_button.pack(side=tk.LEFT, padx=5)
         
         ttk.Button(button_frame, text="清除日志", command=self.clear_log, width=15).pack(side=tk.LEFT, padx=5)
         
         # 进度显示
         progress_frame = ttk.LabelFrame(main_frame, text="进度", padding="10")
-        progress_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        progress_frame.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
         
         self.progress_var = tk.StringVar(value="就绪")
         ttk.Label(progress_frame, textvariable=self.progress_var).pack(anchor=tk.W)
@@ -286,7 +290,7 @@ class DocumentProcessorApp:
         
         # 日志显示
         log_frame = ttk.LabelFrame(main_frame, text="处理日志", padding="10")
-        log_frame.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        log_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
         
         self.log_text = scrolledtext.ScrolledText(log_frame, height=15, width=100)
         self.log_text.pack(fill=tk.BOTH, expand=True)
@@ -322,12 +326,28 @@ class DocumentProcessorApp:
         else:
             self.custom_size_frame.grid_remove()
     
+    def on_directory_changed(self, *args):
+        """当目录路径改变时的回调"""
+        directory = self.root_dir_var.get().strip()
+        if directory and os.path.isdir(directory):
+            # 自动检测目录结构
+            detected_type = self.detect_directory_type(directory)
+            self.dir_type_var.set(detected_type)
+            self.log(f"检测到目录: {directory}")
+            self.log(f"自动检测目录结构: {detected_type}")
+        elif directory:
+            # 路径不存在
+            self.dir_type_var.set("路径无效")
+        else:
+            # 路径为空
+            self.dir_type_var.set("未检测")
+    
     def browse_directory(self):
         """浏览并选择目录"""
         directory = filedialog.askdirectory(title="选择根目录")
         if directory:
+            # trace_add已经会触发on_directory_changed，所以这里只需要设置值
             self.root_dir_var.set(directory)
-            self.log(f"已选择目录: {directory}")
     
     def log(self, message):
         """添加日志信息"""
@@ -338,6 +358,62 @@ class DocumentProcessorApp:
     def clear_log(self):
         """清除日志"""
         self.log_text.delete(1.0, tk.END)
+    
+    def detect_directory_type(self, root_dir):
+        """
+        自动检测目录结构类型
+        
+        Args:
+            root_dir: 根目录路径
+            
+        Returns:
+            "村" 或 "乡"
+        """
+        try:
+            # 检查是否有图片文件的函数
+            def has_images(directory):
+                image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'}
+                for item in os.listdir(directory):
+                    if os.path.isfile(os.path.join(directory, item)):
+                        _, ext = os.path.splitext(item)
+                        if ext.lower() in image_extensions:
+                            return True
+                return False
+            
+            # 检查第一级子目录
+            level1_dirs = [d for d in os.listdir(root_dir) 
+                          if os.path.isdir(os.path.join(root_dir, d)) and not d.startswith('.')]
+            
+            if not level1_dirs:
+                return "村"  # 默认返回村
+            
+            # 检查第一个一级子目录
+            first_level1_path = os.path.join(root_dir, level1_dirs[0])
+            
+            # 如果一级目录中有图片，说明是二级结构（村）
+            if has_images(first_level1_path):
+                return "村"
+            
+            # 检查一级目录下是否有子目录
+            level2_dirs = [d for d in os.listdir(first_level1_path)
+                          if os.path.isdir(os.path.join(first_level1_path, d)) and not d.startswith('.')]
+            
+            if not level2_dirs:
+                return "村"  # 一级目录下没有子目录，说明是村
+            
+            # 检查第一个二级目录
+            first_level2_path = os.path.join(first_level1_path, level2_dirs[0])
+            
+            # 如果二级目录中有图片，说明是三级结构（乡）
+            if has_images(first_level2_path):
+                return "乡"
+            
+            # 默认返回村
+            return "村"
+            
+        except Exception as e:
+            self.log(f"检测目录结构失败: {str(e)}")
+            return "村"  # 出错时默认返回村
     
     def get_page_size(self):
         """获取页面尺寸"""
@@ -420,7 +496,7 @@ class DocumentProcessorApp:
     
     def merge_images_horizontally(self, image_paths, output_path):
         """
-        将多张图片垂直拼接成一张大图（上下排列），确保每张图片的长边朝下
+        将多张图片垂直拼接成一张大图（上下排列），保持原图方向不变
         
         Args:
             image_paths: 图片路径列表
@@ -433,14 +509,8 @@ class DocumentProcessorApp:
             if not image_paths:
                 return False
             
-            # 打开所有图片并旋转（确保长边朝下）
-            images = []
-            for img_path in image_paths:
-                img = Image.open(img_path)
-                # 如果宽度大于高度（横向图片），则旋转90度
-                if img.width > img.height:
-                    img = img.rotate(90, expand=True)
-                images.append(img)
+            # 打开所有图片（保持原始方向）
+            images = [Image.open(img_path) for img_path in image_paths]
             
             # 计算拼接后的尺寸
             # 宽度取所有图片中的最大宽度
@@ -470,6 +540,11 @@ class DocumentProcessorApp:
                 merged.paste(img, (x_offset, y_offset))
                 y_offset += img.height
             
+            # 拼接后顺时针旋转90度
+            self.log(f"拼接完成，尺寸: {merged.width}x{merged.height}，开始顺时针旋转90度")
+            merged = merged.rotate(-90, expand=True)  # -90度是顺时针旋转
+            self.log(f"旋转后尺寸: {merged.width}x{merged.height}")
+            
             # 保存为高质量JPEG（无损PNG太大）
             merged.save(output_path, 'JPEG', quality=95, optimize=True)
             
@@ -495,20 +570,40 @@ class DocumentProcessorApp:
             # 将毫米转换为像素（假设300 DPI）
             dpi = 300
             size_px = int(size_mm * dpi / 25.4)
-            
+
+            # 先以最小box_size生成二维码矩阵，再根据目标像素计算最优box_size
+            border = 1  # 最小安全边框
             qr = qrcode.QRCode(
-                version=1,  # 自动选择最小版本
-                error_correction=qrcode.constants.ERROR_CORRECT_L,  # 最低容错级别（7%）
-                box_size=5,  # 进一步减小box_size（从8改为5）
-                border=1,   # 进一步减小边框（从2改为1，QR码标准最小边框）
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=1,
+                border=border,
             )
             qr.add_data(url)
             qr.make(fit=True)
-            
+
+            # 获取模块数量（每边的模块数）
+            modules = getattr(qr, 'modules_count', None)
+            if modules is None:
+                try:
+                    modules = len(qr.get_matrix())
+                except Exception:
+                    modules = 21
+
+            # 计算合适的box_size，使得生成时模块尽可能小
+            # 保证至少为1像素
+            box_size = max(1, size_px // (modules + 2 * border))
+
+            # 使用计算出的box_size生成图像
+            qr.box_size = box_size
             img = qr.make_image(fill_color="black", back_color="white")
-            img = img.resize((size_px, size_px), Image.Resampling.LANCZOS)
+
+            # 如果生成的尺寸与目标尺寸不同，使用最近邻插值放缩以保持模块清晰
+            final_w = img.size[0]
+            if final_w != size_px:
+                img = img.resize((size_px, size_px), resample=Image.Resampling.NEAREST)
+
             img.save(output_path)
-            
             return True
         except Exception as e:
             self.log(f"生成二维码失败: {str(e)}")
@@ -523,8 +618,8 @@ class DocumentProcessorApp:
             pdf_path: PDF输出路径
             page_size: 页面尺寸
             qr_size_mm: 二维码大小（毫米）
-            x_mm: X坐标（毫米）
-            y_mm: Y坐标（毫米）
+            x_mm: X坐标（毫米，二维码左下角）
+            y_mm: Y坐标（毫米，二维码左下角）
         """
         try:
             c = canvas.Canvas(pdf_path, pagesize=page_size)
@@ -766,6 +861,65 @@ class DocumentProcessorApp:
             self.log(f"    ✗ 上传失败: {result}")
             return False, None
     
+    def get_directory_prefix(self, directory, root_dir):
+        """
+        获取目录的完整路径前缀（用于文件命名）
+        
+        Args:
+            directory: 目标目录路径
+            root_dir: 根目录路径
+            
+        Returns:
+            目录前缀字符串，例如 "根目录_一级_二级"
+        """
+        if root_dir and directory.startswith(root_dir):
+            root_name = os.path.basename(root_dir)
+            rel_path = os.path.relpath(directory, root_dir)
+            if rel_path == '.':
+                return root_name
+            else:
+                # 将路径分隔符替换为下划线
+                path_parts = [root_name] + rel_path.split(os.sep)
+                return '_'.join(path_parts)
+        else:
+            return os.path.basename(directory)
+    
+    def copy_to_error_folder(self, directory, root_dir, error_message):
+        """
+        将处理失败的目录复制到error文件夹，保持原有目录结构
+        
+        Args:
+            directory: 失败的目录路径
+            root_dir: 根目录路径
+            error_message: 错误信息
+        """
+        try:
+            import shutil
+            
+            # 创建error文件夹（在根目录同级）
+            parent_dir = os.path.dirname(root_dir) if root_dir else os.path.dirname(directory)
+            error_base = os.path.join(parent_dir, "error")
+            
+            # 计算相对路径并创建对应的error子目录
+            if root_dir and directory.startswith(root_dir):
+                rel_path = os.path.relpath(directory, root_dir)
+                error_target = os.path.join(error_base, os.path.basename(root_dir), rel_path)
+            else:
+                error_target = os.path.join(error_base, os.path.basename(directory))
+            
+            # 如果目标已存在，先删除
+            if os.path.exists(error_target):
+                shutil.rmtree(error_target)
+            
+            # 复制目录（而不是移动）
+            shutil.copytree(directory, error_target)
+            
+            self.log(f"  ✗ 失败：{error_message}")
+            self.log(f"     已复制至: {error_target}")
+            
+        except Exception as e:
+            self.log(f"  复制到error文件夹失败: {str(e)}")
+    
     def process_directory(self, directory, page_size, qr_size_mm, x_mm, y_mm, auto_upload=False, root_dir=None):
         """
         处理单个目录：上传图片、生成二维码和PDF
@@ -778,98 +932,94 @@ class DocumentProcessorApp:
             y_mm: 二维码Y坐标
             auto_upload: 是否自动上传
             root_dir: 根目录路径（用于构建OSS路径）
+            
+        Returns:
+            (success: bool, error_message: str) 成功返回(True, None)，失败返回(False, 错误信息)
         """
         dir_name = os.path.basename(directory)
-        self.log(f"处理目录: {dir_name}")
+        dir_prefix = self.get_directory_prefix(directory, root_dir)
         
-        # 检查目录中是否有图片
-        images = self.get_images_in_directory(directory)
-        if not images:
-            self.log(f"  跳过（无图片）: {dir_name}")
-            return
+        try:
+            # 检查目录中是否有图片
+            images = self.get_images_in_directory(directory)
+            if not images:
+                return True, None  # 无图片不算错误
+            
+            # 合并图片
+            merged_filename = f"{dir_prefix}_merged.jpg"
+            merged_path = os.path.join(directory, merged_filename)
+            
+            if not self.merge_images_horizontally(images, merged_path):
+                return False, "图片合并失败"
+            
+            # 如果启用自动上传，上传合并后的大图到OSS
+            oss_url = None
+            if auto_upload:
+                success, oss_url = self.upload_merged_image_to_oss(merged_path, directory, root_dir)
+                if not success:
+                    return False, "OSS上传失败"
         
-        self.log(f"  找到 {len(images)} 张图片")
-        
-        # 合并图片
-        merged_filename = f"{dir_name}_merged.jpg"
-        merged_path = os.path.join(directory, merged_filename)
-        
-        self.log(f"  合并图片...")
-        if not self.merge_images_horizontally(images, merged_path):
-            self.log(f"  图片合并失败，跳过")
-            return
-        
-        self.log(f"  已合并 {len(images)} 张图片")
-        
-        # 如果启用自动上传，上传合并后的大图到OSS
-        oss_url = None
-        if auto_upload:
-            success, oss_url = self.upload_merged_image_to_oss(merged_path, directory, root_dir)
-            if not success:
-                self.log(f"  警告：上传失败，将使用默认URL生成二维码")
-        
-        # 如果没有OSS URL，使用默认格式
-        if not oss_url:
-            # 构建默认OSS URL
-            if self.oss_config.is_valid():
-                endpoint_without_protocol = self.oss_config.endpoint.replace('http://', '').replace('https://', '')
-                
-                # 构建OSS路径
-                if root_dir:
-                    root_name = os.path.basename(root_dir)
-                    # 计算相对路径
-                    if directory.startswith(root_dir):
-                        rel_path = os.path.relpath(directory, root_dir)
-                        if rel_path == '.':
-                            oss_path = f"{root_name}/{merged_filename}"
+            # 如果没有OSS URL，使用默认格式
+            if not oss_url:
+                # 构建默认OSS URL
+                if self.oss_config.is_valid():
+                    endpoint_without_protocol = self.oss_config.endpoint.replace('http://', '').replace('https://', '')
+                    
+                    # 构建OSS路径
+                    if root_dir:
+                        root_name = os.path.basename(root_dir)
+                        # 计算相对路径
+                        if directory.startswith(root_dir):
+                            rel_path = os.path.relpath(directory, root_dir)
+                            if rel_path == '.':
+                                oss_path = f"{root_name}/{merged_filename}"
+                            else:
+                                oss_path = f"{root_name}/{rel_path}/{merged_filename}"
                         else:
-                            oss_path = f"{root_name}/{rel_path}/{merged_filename}"
+                            oss_path = f"{dir_name}/{merged_filename}"
                     else:
                         oss_path = f"{dir_name}/{merged_filename}"
+                    
+                    # URL编码路径
+                    encoded_path = quote(oss_path, safe='/')
+                    
+                    # 构建完整URL
+                    if self.oss_config.base_path:
+                        encoded_base = quote(self.oss_config.base_path.strip('/'), safe='')
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_base}/{encoded_path}"
+                    else:
+                        oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_path}"
                 else:
-                    oss_path = f"{dir_name}/{merged_filename}"
-                
-                # URL编码路径
-                encoded_path = quote(oss_path, safe='/')
-                
-                # 构建完整URL
-                if self.oss_config.base_path:
-                    encoded_base = quote(self.oss_config.base_path.strip('/'), safe='')
-                    oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_base}/{encoded_path}"
-                else:
-                    oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_path}"
-            else:
-                oss_url = f"https://your-bucket.oss-region.aliyuncs.com/{quote(dir_name, safe='')}/{quote(merged_filename, safe='')}"
-        
-        # 对URL进行编码（如果包含中文字符）
-        # 注意：只编码路径部分，不编码协议和域名
-        if oss_url and '://' in oss_url:
-            protocol, rest = oss_url.split('://', 1)
-            if '/' in rest:
-                domain, path = rest.split('/', 1)
-                # 对路径进行URL编码，但保留斜杠
-                encoded_path = quote(path, safe='/')
-                oss_url = f"{protocol}://{domain}/{encoded_path}"
-        
-        # 生成二维码
-        qr_filename = f"{dir_name}_qr.png"
-        qr_path = os.path.join(directory, qr_filename)
-        
-        if self.generate_qrcode(oss_url, qr_path, qr_size_mm):
-            self.log(f"  二维码已生成: {qr_filename}")
-            self.log(f"  二维码URL: {oss_url}")
-        else:
-            self.log(f"  二维码生成失败")
-            return
-        
-        # 生成PDF
-        pdf_filename = f"{dir_name}_qr.pdf"
-        pdf_path = os.path.join(directory, pdf_filename)
-        
-        if self.create_pdf_with_qrcode(qr_path, pdf_path, page_size, qr_size_mm, x_mm, y_mm):
-            self.log(f"  PDF已生成: {pdf_filename}")
-        else:
-            self.log(f"  PDF生成失败")
+                    return False, "OSS未配置"
+            
+            # 对URL进行编码（如果包含中文字符）
+            # 注意：只编码路径部分，不编码协议和域名
+            if oss_url and '://' in oss_url:
+                protocol, rest = oss_url.split('://', 1)
+                if '/' in rest:
+                    domain, path = rest.split('/', 1)
+                    # 对路径进行URL编码，但保留斜杠
+                    encoded_path = quote(path, safe='/')
+                    oss_url = f"{protocol}://{domain}/{encoded_path}"
+            
+            # 生成二维码
+            qr_filename = f"{dir_prefix}_qr.png"
+            qr_path = os.path.join(directory, qr_filename)
+            
+            if not self.generate_qrcode(oss_url, qr_path, qr_size_mm):
+                return False, "二维码生成失败"
+            
+            # 生成PDF
+            pdf_filename = f"{dir_prefix}_qr.pdf"
+            pdf_path = os.path.join(directory, pdf_filename)
+            
+            if not self.create_pdf_with_qrcode(qr_path, pdf_path, page_size, qr_size_mm, x_mm, y_mm):
+                return False, "PDF生成失败"
+            
+            return True, None
+            
+        except Exception as e:
+            return False, f"处理异常: {str(e)}"
     
     def start_processing(self):
         """开始处理"""
@@ -906,94 +1056,11 @@ class DocumentProcessorApp:
         thread.daemon = True
         thread.start()
     
-    def upload_only(self):
-        """仅上传到OSS"""
-        if not self.oss_config.is_valid():
-            messagebox.showerror("错误", "请先配置OSS")
-            return
-        
-        root_dir = self.root_dir_var.get()
-        if not root_dir or not os.path.isdir(root_dir):
-            messagebox.showerror("错误", "请选择有效的根目录")
-            return
-        
-        thread = threading.Thread(target=self.upload_all_directories, args=(root_dir,))
-        thread.daemon = True
-        thread.start()
-    
-    def upload_all_directories(self, root_dir):
-        """仅上传所有目录到OSS"""
-        try:
-            self.upload_button.config(state='disabled')
-            self.start_button.config(state='disabled')
-            self.progress_bar.start()
-            self.progress_var.set("正在上传...")
-            
-            self.log("=" * 60)
-            self.log("开始上传到OSS...")
-            self.log(f"根目录: {root_dir}")
-            self.log("=" * 60)
-            
-            dir_type = self.dir_type_var.get()
-            target_dirs = self.get_target_directories(root_dir, dir_type)
-            
-            self.log(f"找到 {len(target_dirs)} 个目标目录")
-            self.log("")
-            
-            total_success = 0
-            total_fail = 0
-            
-            for target_dir in target_dirs:
-                dir_name = os.path.basename(target_dir)
-                self.log(f"上传目录: {dir_name}")
-                
-                images = self.get_images_in_directory(target_dir)
-                if not images:
-                    self.log(f"  跳过（无图片）")
-                    self.log("")
-                    continue
-                
-                # 合并图片
-                merged_filename = f"{dir_name}_merged.jpg"
-                merged_path = os.path.join(target_dir, merged_filename)
-                
-                self.log(f"  合并 {len(images)} 张图片...")
-                if not self.merge_images_horizontally(images, merged_path):
-                    self.log(f"  图片合并失败，跳过")
-                    total_fail += 1
-                    self.log("")
-                    continue
-                
-                # 上传合并后的图片
-                success, oss_url = self.upload_merged_image_to_oss(merged_path, target_dir, root_dir)
-                if success:
-                    total_success += 1
-                else:
-                    total_fail += 1
-                
-                self.log("")
-            
-            self.log("=" * 60)
-            self.log(f"上传完成！成功 {total_success} 个目录，失败 {total_fail} 个")
-            self.log("=" * 60)
-            
-            self.progress_var.set("上传完成")
-            messagebox.showinfo("完成", f"上传完成！\n成功: {total_success}\n失败: {total_fail}")
-            
-        except Exception as e:
-            self.log(f"上传过程中出错: {str(e)}")
-            messagebox.showerror("错误", f"上传过程中出错: {str(e)}")
-        finally:
-            self.upload_button.config(state='normal')
-            self.start_button.config(state='normal')
-            self.progress_bar.stop()
-    
     def process_all_directories(self, root_dir, page_size, qr_size_mm, x_mm, y_mm, auto_upload):
         """处理所有目录（在后台线程中运行）"""
         try:
             # 禁用按钮
             self.start_button.config(state='disabled')
-            self.upload_button.config(state='disabled')
             self.progress_bar.start()
             self.progress_var.set("正在处理...")
             
@@ -1016,17 +1083,41 @@ class DocumentProcessorApp:
             
             # 处理每个目录
             success_count = 0
-            for target_dir in target_dirs:
-                self.process_directory(target_dir, page_size, qr_size_mm, x_mm, y_mm, auto_upload, root_dir)
-                success_count += 1
-                self.log("")
+            fail_count = 0
+            skip_count = 0
             
+            for target_dir in target_dirs:
+                dir_name = os.path.basename(target_dir)
+                
+                # 检查是否有图片
+                images = self.get_images_in_directory(target_dir)
+                if not images:
+                    self.log(f"跳过 {dir_name} (无图片)")
+                    skip_count += 1
+                    continue
+                
+                # 处理目录
+                success, error_msg = self.process_directory(target_dir, page_size, qr_size_mm, x_mm, y_mm, auto_upload, root_dir)
+                
+                if success:
+                    self.log(f"✓ 成功: {dir_name}")
+                    success_count += 1
+                else:
+                    self.log(f"✗ 失败: {dir_name} - {error_msg}")
+                    fail_count += 1
+                    # 复制到error文件夹
+                    self.copy_to_error_folder(target_dir, root_dir, error_msg)
+            
+            self.log("")
             self.log("=" * 60)
-            self.log(f"处理完成！共处理 {success_count} 个目录")
+            self.log(f"处理完成！")
+            self.log(f"  成功: {success_count} 个")
+            self.log(f"  失败: {fail_count} 个")
+            self.log(f"  跳过: {skip_count} 个")
             self.log("=" * 60)
             
             self.progress_var.set("处理完成")
-            messagebox.showinfo("完成", f"处理完成！共处理 {success_count} 个目录")
+            messagebox.showinfo("完成", f"处理完成！\n成功: {success_count}\n失败: {fail_count}\n跳过: {skip_count}")
             
         except Exception as e:
             self.log(f"处理过程中出错: {str(e)}")
@@ -1034,7 +1125,6 @@ class DocumentProcessorApp:
         finally:
             # 恢复按钮
             self.start_button.config(state='normal')
-            self.upload_button.config(state='normal')
             self.progress_bar.stop()
 
 
