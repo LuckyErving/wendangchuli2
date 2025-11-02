@@ -557,8 +557,17 @@ class DocumentProcessorApp:
             if not image_paths:
                 return False
             
-            # 打开所有图片（保持原始方向）
-            images = [Image.open(img_path) for img_path in image_paths]
+            # 打开所有图片并根据EXIF信息自动旋转到正确方向
+            images = []
+            for img_path in image_paths:
+                img = Image.open(img_path)
+                # 处理EXIF方向信息，确保图片按正确方向显示
+                try:
+                    from PIL import ImageOps
+                    img = ImageOps.exif_transpose(img)
+                except Exception:
+                    pass  # 如果没有EXIF信息或处理失败，保持原样
+                images.append(img)
             
             # 计算拼接后的尺寸
             # 宽度取所有图片中的最大宽度
@@ -588,10 +597,8 @@ class DocumentProcessorApp:
                 merged.paste(img, (x_offset, y_offset))
                 y_offset += img.height
             
-            # 拼接后顺时针旋转90度
-            self.log(f"拼接完成，尺寸: {merged.width}x{merged.height}，开始顺时针旋转90度")
-            merged = merged.rotate(-90, expand=True)  # -90度是顺时针旋转
-            self.log(f"旋转后尺寸: {merged.width}x{merged.height}")
+            # 拼接完成（保持原图方向，按从上到下顺序，不做自动旋转）
+            self.log(f"拼接完成，尺寸: {merged.width}x{merged.height}")
             
             # 保存为高质量JPEG（无损PNG太大）
             merged.save(output_path, 'JPEG', quality=95, optimize=True)
