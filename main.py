@@ -420,7 +420,7 @@ class DocumentProcessorApp:
     
     def merge_images_horizontally(self, image_paths, output_path):
         """
-        将多张图片水平拼接成一张大图（无损）
+        将多张图片垂直拼接成一张大图（上下排列）
         
         Args:
             image_paths: 图片路径列表
@@ -437,16 +437,16 @@ class DocumentProcessorApp:
             images = [Image.open(img_path) for img_path in image_paths]
             
             # 计算拼接后的尺寸
-            # 高度取所有图片中的最大高度
-            max_height = max(img.height for img in images)
-            # 宽度为所有图片宽度之和
-            total_width = sum(img.width for img in images)
+            # 宽度取所有图片中的最大宽度
+            max_width = max(img.width for img in images)
+            # 高度为所有图片高度之和
+            total_height = sum(img.height for img in images)
             
             # 创建新图片（使用RGB模式以支持JPEG保存）
-            merged = Image.new('RGB', (total_width, max_height), (255, 255, 255))
+            merged = Image.new('RGB', (max_width, total_height), (255, 255, 255))
             
-            # 逐个粘贴图片
-            x_offset = 0
+            # 逐个粘贴图片（从上到下）
+            y_offset = 0
             for img in images:
                 # 如果图片有透明通道，转换为RGB
                 if img.mode in ('RGBA', 'LA', 'P'):
@@ -459,10 +459,10 @@ class DocumentProcessorApp:
                 elif img.mode != 'RGB':
                     img = img.convert('RGB')
                 
-                # 将图片居中粘贴（如果高度不一致）
-                y_offset = (max_height - img.height) // 2
+                # 将图片居中粘贴（如果宽度不一致）
+                x_offset = (max_width - img.width) // 2
                 merged.paste(img, (x_offset, y_offset))
-                x_offset += img.width
+                y_offset += img.height
             
             # 保存为高质量JPEG（无损PNG太大）
             merged.save(output_path, 'JPEG', quality=95, optimize=True)
@@ -493,8 +493,8 @@ class DocumentProcessorApp:
             qr = qrcode.QRCode(
                 version=1,  # 自动选择最小版本
                 error_correction=qrcode.constants.ERROR_CORRECT_L,  # 最低容错级别（7%）
-                box_size=8,  # 减小box_size（从10改为8）
-                border=2,   # 减小边框（从4改为2）
+                box_size=5,  # 进一步减小box_size（从8改为5）
+                border=1,   # 进一步减小边框（从2改为1，QR码标准最小边框）
             )
             qr.add_data(url)
             qr.make(fit=True)
