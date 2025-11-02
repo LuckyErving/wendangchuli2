@@ -401,17 +401,18 @@ class DocumentProcessorApp:
             directory: 目录路径
             
         Returns:
-            图片文件列表
+            图片文件完整路径列表
         """
         image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'}
         images = []
         
         try:
             for item in os.listdir(directory):
-                if os.path.isfile(os.path.join(directory, item)):
+                full_path = os.path.join(directory, item)
+                if os.path.isfile(full_path):
                     _, ext = os.path.splitext(item)
                     if ext.lower() in image_extensions:
-                        images.append(item)
+                        images.append(full_path)  # 返回完整路径而不是文件名
         except Exception as e:
             self.log(f"读取目录 {directory} 时出错: {str(e)}")
         
@@ -946,7 +947,19 @@ class DocumentProcessorApp:
                     self.log("")
                     continue
                 
-                success, oss_url = self.upload_directory_to_oss(target_dir, root_dir)
+                # 合并图片
+                merged_filename = f"{dir_name}_merged.jpg"
+                merged_path = os.path.join(target_dir, merged_filename)
+                
+                self.log(f"  合并 {len(images)} 张图片...")
+                if not self.merge_images_horizontally(images, merged_path):
+                    self.log(f"  图片合并失败，跳过")
+                    total_fail += 1
+                    self.log("")
+                    continue
+                
+                # 上传合并后的图片
+                success, oss_url = self.upload_merged_image_to_oss(merged_path, target_dir, root_dir)
                 if success:
                     total_success += 1
                 else:
