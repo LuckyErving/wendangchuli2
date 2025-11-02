@@ -417,9 +417,67 @@ class DocumentProcessorApp:
         
         return images
     
+    def merge_images_horizontally(self, image_paths, output_path):
+        """
+        将多张图片水平拼接成一张大图（无损）
+        
+        Args:
+            image_paths: 图片路径列表
+            output_path: 输出文件路径
+        
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            if not image_paths:
+                return False
+            
+            # 打开所有图片
+            images = [Image.open(img_path) for img_path in image_paths]
+            
+            # 计算拼接后的尺寸
+            # 高度取所有图片中的最大高度
+            max_height = max(img.height for img in images)
+            # 宽度为所有图片宽度之和
+            total_width = sum(img.width for img in images)
+            
+            # 创建新图片（使用RGB模式以支持JPEG保存）
+            merged = Image.new('RGB', (total_width, max_height), (255, 255, 255))
+            
+            # 逐个粘贴图片
+            x_offset = 0
+            for img in images:
+                # 如果图片有透明通道，转换为RGB
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    # 创建白色背景
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # 将图片居中粘贴（如果高度不一致）
+                y_offset = (max_height - img.height) // 2
+                merged.paste(img, (x_offset, y_offset))
+                x_offset += img.width
+            
+            # 保存为高质量JPEG（无损PNG太大）
+            merged.save(output_path, 'JPEG', quality=95, optimize=True)
+            
+            # 关闭所有图片
+            for img in images:
+                img.close()
+            
+            return True
+        except Exception as e:
+            self.log(f"合并图片失败: {str(e)}")
+            return False
+
     def generate_qrcode(self, url, output_path, size_mm=50):
         """
-        生成二维码图片
+        生成二维码图片（优化后更小）
         
         Args:
             url: 二维码内容（URL）
@@ -432,10 +490,10 @@ class DocumentProcessorApp:
             size_px = int(size_mm * dpi / 25.4)
             
             qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_H,
-                box_size=10,
-                border=4,
+                version=1,  # 自动选择最小版本
+                error_correction=qrcode.constants.ERROR_CORRECT_L,  # 最低容错级别（7%）
+                box_size=8,  # 减小box_size（从10改为8）
+                border=2,   # 减小边框（从4改为2）
             )
             qr.add_data(url)
             qr.make(fit=True)
@@ -666,16 +724,17 @@ class DocumentProcessorApp:
             self.log(f"  生成index.html失败: {str(e)}")
             return None
     
-    def upload_directory_to_oss(self, directory, root_dir=None):
+    def upload_merged_image_to_oss(self, merged_image_path, directory, root_dir=None):
         """
-        上传目录到OSS
+        上传合并后的大图到OSS
         
         Args:
-            directory: 目录路径
+            merged_image_path: 合并后的图片路径
+            directory: 原目录路径
             root_dir: 根目录路径（用于构建完整路径结构）
             
         Returns:
-            (成功, OSS URL前缀)
+            (成功, 图片URL)
         """
         if not self.oss_uploader:
             self.log("  OSS未配置，跳过上传")
@@ -685,48 +744,20 @@ class DocumentProcessorApp:
         if root_dir:
             root_name = os.path.basename(root_dir)
             dir_name = os.path.basename(directory)
-            oss_dir_prefix = f"{root_name}/{dir_name}"
+            oss_path = f"{root_name}/{dir_name}/{os.path.basename(merged_image_path)}"
         else:
-            oss_dir_prefix = os.path.basename(directory)
-            dir_name = oss_dir_prefix
+            dir_name = os.path.basename(directory)
+            oss_path = f"{dir_name}/{os.path.basename(merged_image_path)}"
         
-        def upload_callback(file_path, success, result):
-            if success:
-                self.log(f"    ✓ 已上传: {os.path.basename(file_path)}")
-            else:
-                self.log(f"    ✗ 上传失败: {os.path.basename(file_path)} - {result}")
+        self.log(f"  开始上传合并图片到OSS...")
+        success, result = self.oss_uploader.upload_file(merged_image_path, oss_path)
         
-        self.log(f"  开始上传图片到OSS...")
-        success_count, fail_count, uploaded_files = self.oss_uploader.upload_directory(
-            directory, oss_dir_prefix, callback=upload_callback
-        )
-        
-        self.log(f"  上传完成: 成功 {success_count} 个, 失败 {fail_count} 个")
-        
-        # 构建OSS URL前缀
-        if uploaded_files:
-            # 生成index.html
-            self.log(f"  生成图片浏览页面...")
-            index_path = self.generate_index_html(directory, uploaded_files, dir_name)
-            
-            if index_path:
-                # 上传index.html到OSS
-                index_oss_path = f"{oss_dir_prefix}/index.html"
-                success, result = self.oss_uploader.upload_file(index_path, index_oss_path)
-                
-                if success:
-                    self.log(f"    ✓ 已上传: index.html")
-                    # 返回index.html的URL
-                    return True, result
-                else:
-                    self.log(f"    ✗ 上传index.html失败: {result}")
-            
-            # 如果index.html上传失败，返回目录URL
-            first_url = uploaded_files[0]['url']
-            oss_url_prefix = first_url.rsplit('/', 1)[0]
-            return True, oss_url_prefix
-        
-        return False, None
+        if success:
+            self.log(f"    ✓ 已上传: {os.path.basename(merged_image_path)}")
+            return True, result
+        else:
+            self.log(f"    ✗ 上传失败: {result}")
+            return False, None
     
     def process_directory(self, directory, page_size, qr_size_mm, x_mm, y_mm, auto_upload=False, root_dir=None):
         """
@@ -752,10 +783,21 @@ class DocumentProcessorApp:
         
         self.log(f"  找到 {len(images)} 张图片")
         
-        # 如果启用自动上传，先上传图片到OSS
+        # 合并图片
+        merged_filename = f"{dir_name}_merged.jpg"
+        merged_path = os.path.join(directory, merged_filename)
+        
+        self.log(f"  合并图片...")
+        if not self.merge_images_horizontally(images, merged_path):
+            self.log(f"  图片合并失败，跳过")
+            return
+        
+        self.log(f"  已合并 {len(images)} 张图片")
+        
+        # 如果启用自动上传，上传合并后的大图到OSS
         oss_url = None
         if auto_upload:
-            success, oss_url = self.upload_directory_to_oss(directory, root_dir)
+            success, oss_url = self.upload_merged_image_to_oss(merged_path, directory, root_dir)
             if not success:
                 self.log(f"  警告：上传失败，将使用默认URL生成二维码")
         
@@ -765,36 +807,32 @@ class DocumentProcessorApp:
             if self.oss_config.is_valid():
                 endpoint_without_protocol = self.oss_config.endpoint.replace('http://', '').replace('https://', '')
                 
-                # 构建OSS路径（与upload_directory_to_oss保持一致）
+                # 构建OSS路径
                 if root_dir:
                     root_name = os.path.basename(root_dir)
                     # 计算相对路径
                     if directory.startswith(root_dir):
                         rel_path = os.path.relpath(directory, root_dir)
                         if rel_path == '.':
-                            # directory就是root_dir，只使用root_name
-                            oss_path = root_name
+                            oss_path = f"{root_name}/{merged_filename}"
                         else:
-                            # directory是root_dir的子目录
-                            oss_path = f"{root_name}/{rel_path}"
+                            oss_path = f"{root_name}/{rel_path}/{merged_filename}"
                     else:
-                        # 不在root_dir下，使用directory的basename
-                        oss_path = dir_name
+                        oss_path = f"{dir_name}/{merged_filename}"
                 else:
-                    # 没有root_dir，只使用dir_name
-                    oss_path = dir_name
+                    oss_path = f"{dir_name}/{merged_filename}"
                 
                 # URL编码路径
-                encoded_path = quote(oss_path, safe='')
+                encoded_path = quote(oss_path, safe='/')
                 
                 # 构建完整URL
                 if self.oss_config.base_path:
                     encoded_base = quote(self.oss_config.base_path.strip('/'), safe='')
-                    oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_base}/{encoded_path}/index.html"
+                    oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_base}/{encoded_path}"
                 else:
-                    oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_path}/index.html"
+                    oss_url = f"https://{self.oss_config.bucket_name}.{endpoint_without_protocol}/{encoded_path}"
             else:
-                oss_url = f"https://your-bucket.oss-region.aliyuncs.com/{quote(dir_name, safe='')}/index.html"
+                oss_url = f"https://your-bucket.oss-region.aliyuncs.com/{quote(dir_name, safe='')}/{quote(merged_filename, safe='')}"
         
         # 对URL进行编码（如果包含中文字符）
         # 注意：只编码路径部分，不编码协议和域名
