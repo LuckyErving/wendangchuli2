@@ -20,6 +20,8 @@ wheels/
 .installed.cfg
 *.egg
 
+西沟乡麻地沟村（资料扫描）/
+
 # Virtual Environment
 .venv/
 venv/

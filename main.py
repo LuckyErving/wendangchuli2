@@ -21,6 +21,8 @@ import re
 import shutil
 from pypinyin import lazy_pinyin, Style
 from oss_helper import OSSConfig, OSSUploader
+from docx import Document
+from docx.shared import Mm
 
 
 def chinese_to_pinyin_initials(text):
@@ -238,15 +240,13 @@ class DocumentProcessorApp:
         self.dir_type_label.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
         # ttk.Label(dir_frame, text="（自动检测）", foreground="gray").grid(row=1, column=2, sticky=tk.W, pady=5)
         
-        # 创建横向容器放置OSS和PDF设置
+        # 创建横向容器放置OSS设置
         settings_container = ttk.Frame(main_frame)
         settings_container.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
-        settings_container.columnconfigure(0, weight=1)
-        settings_container.columnconfigure(1, weight=1)
         
         # OSS设置
         oss_frame = ttk.LabelFrame(settings_container, text="OSS设置", padding="10")
-        oss_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
+        oss_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
         
         oss_button_frame = ttk.Frame(oss_frame)
         oss_button_frame.grid(row=0, column=0, sticky=tk.W)
@@ -262,9 +262,22 @@ class DocumentProcessorApp:
         ttk.Checkbutton(oss_frame, text="生成二维码后自动上传图片到OSS", 
                        variable=self.auto_upload_var).grid(row=1, column=0, sticky=tk.W, pady=5)
         
+        # 文档类型选择
+        doc_type_frame = ttk.LabelFrame(main_frame, text="文档类型", padding="10")
+        doc_type_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        
+        ttk.Label(doc_type_frame, text="输出格式:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.doc_type_var = tk.StringVar(value="PDF")
+        doc_type_option_frame = ttk.Frame(doc_type_frame)
+        doc_type_option_frame.grid(row=0, column=1, sticky=tk.W, pady=5)
+        ttk.Radiobutton(doc_type_option_frame, text="PDF", variable=self.doc_type_var, 
+                       value="PDF", command=self.on_doc_type_change).pack(side=tk.LEFT, padx=5)
+        ttk.Radiobutton(doc_type_option_frame, text="Word", variable=self.doc_type_var, 
+                       value="Word", command=self.on_doc_type_change).pack(side=tk.LEFT, padx=5)
+        
         # PDF设置
-        pdf_frame = ttk.LabelFrame(settings_container, text="PDF设置", padding="10")
-        pdf_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(5, 0))
+        pdf_frame = ttk.LabelFrame(main_frame, text="PDF设置", padding="10")
+        pdf_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
         
         # 页面尺寸
         ttk.Label(pdf_frame, text="页面尺寸:").grid(row=0, column=0, sticky=tk.W, pady=5)
@@ -294,11 +307,40 @@ class DocumentProcessorApp:
         self.custom_height_var = tk.StringVar(value="238")
         ttk.Entry(self.custom_size_frame, textvariable=self.custom_height_var, width=8).pack(side=tk.LEFT, padx=2)
         
-        # 默认显示自定义尺寸框（不隐藏）
+        # Word设置
+        word_frame = ttk.LabelFrame(main_frame, text="Word设置", padding="10")
+        word_frame.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        
+        # Word页面尺寸
+        ttk.Label(word_frame, text="页面尺寸:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.word_size_var = tk.StringVar(value="自定义")
+        word_size_combo = ttk.Combobox(word_frame, textvariable=self.word_size_var, 
+                                       values=["A3", "A4", "A5", "自定义"], state="readonly", width=15)
+        word_size_combo.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
+        word_size_combo.bind("<<ComboboxSelected>>", self.on_word_size_change)
+        
+        # Word自定义尺寸
+        self.word_custom_size_frame = ttk.Frame(word_frame)
+        self.word_custom_size_frame.grid(row=0, column=2, columnspan=4, sticky=tk.W, padx=5, pady=5)
+        
+        ttk.Label(self.word_custom_size_frame, text="宽度(mm):").pack(side=tk.LEFT, padx=2)
+        self.word_width_var = tk.StringVar(value="340")
+        ttk.Entry(self.word_custom_size_frame, textvariable=self.word_width_var, width=8).pack(side=tk.LEFT, padx=2)
+        
+        ttk.Label(self.word_custom_size_frame, text="高度(mm):").pack(side=tk.LEFT, padx=2)
+        self.word_height_var = tk.StringVar(value="240")
+        ttk.Entry(self.word_custom_size_frame, textvariable=self.word_height_var, width=8).pack(side=tk.LEFT, padx=2)
+        
+        # 默认隐藏Word设置
+        word_frame.grid_remove()
+        
+        # 保存frame引用以便后续切换显示
+        self.pdf_frame = pdf_frame
+        self.word_frame = word_frame
         
         # 二维码设置
         qr_frame = ttk.LabelFrame(main_frame, text="二维码设置", padding="10")
-        qr_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        qr_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
         
         # 二维码大小
         ttk.Label(qr_frame, text="二维码大小(mm):").grid(row=0, column=0, sticky=tk.W, pady=5)
@@ -319,7 +361,7 @@ class DocumentProcessorApp:
         
         # 操作按钮
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=3, column=0, columnspan=2, pady=15)
+        button_frame.grid(row=6, column=0, columnspan=2, pady=15)
         
         self.start_button = ttk.Button(button_frame, text="开始处理", command=self.start_processing, width=15)
         self.start_button.pack(side=tk.LEFT, padx=5)
@@ -328,7 +370,7 @@ class DocumentProcessorApp:
         
         # 进度显示
         progress_frame = ttk.LabelFrame(main_frame, text="进度", padding="10")
-        progress_frame.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        progress_frame.grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
         
         self.progress_var = tk.StringVar(value="就绪")
         ttk.Label(progress_frame, textvariable=self.progress_var).pack(anchor=tk.W)
@@ -338,7 +380,7 @@ class DocumentProcessorApp:
         
         # 日志显示
         log_frame = ttk.LabelFrame(main_frame, text="处理日志", padding="10")
-        log_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        log_frame.grid(row=8, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
         
         self.log_text = scrolledtext.ScrolledText(log_frame, height=15, width=100)
         self.log_text.pack(fill=tk.BOTH, expand=True)
@@ -373,6 +415,22 @@ class DocumentProcessorApp:
             self.custom_size_frame.grid()
         else:
             self.custom_size_frame.grid_remove()
+    
+    def on_word_size_change(self, event=None):
+        """Word页面尺寸改变时的回调"""
+        if self.word_size_var.get() == "自定义":
+            self.word_custom_size_frame.grid()
+        else:
+            self.word_custom_size_frame.grid_remove()
+    
+    def on_doc_type_change(self):
+        """文档类型改变时的回调"""
+        if self.doc_type_var.get() == "PDF":
+            self.pdf_frame.grid()
+            self.word_frame.grid_remove()
+        else:  # Word
+            self.pdf_frame.grid_remove()
+            self.word_frame.grid()
     
     def on_directory_changed(self, *args):
         """当目录路径改变时的回调"""
@@ -485,6 +543,28 @@ class DocumentProcessorApp:
             if orientation == "横向":
                 page_size = landscape(page_size)
             return page_size
+    
+    def get_word_page_size(self):
+        """获取Word页面尺寸（毫米）"""
+        word_size_name = self.word_size_var.get()
+        
+        # 标准尺寸（毫米）
+        word_sizes = {
+            "A3": (420, 297),
+            "A4": (297, 210),
+            "A5": (210, 148)
+        }
+        
+        if word_size_name == "自定义":
+            try:
+                width = float(self.word_width_var.get())
+                height = float(self.word_height_var.get())
+                return (width, height)
+            except ValueError:
+                messagebox.showerror("错误", "Word自定义尺寸必须是数字")
+                return None, None
+        else:
+            return word_sizes[word_size_name]
     
     def get_target_directories(self, root_dir, dir_type):
         """
@@ -691,6 +771,51 @@ class DocumentProcessorApp:
             return True
         except Exception as e:
             self.log(f"创建PDF失败: {str(e)}")
+            return False
+    
+    def create_word_with_qrcode(self, qr_image_path, word_path, page_width_mm, page_height_mm, qr_size_mm, x_mm, y_mm):
+        """
+        创建Word并插入二维码
+        
+        Args:
+            qr_image_path: 二维码图片路径
+            word_path: Word输出路径
+            page_width_mm: 页面宽度（毫米）
+            page_height_mm: 页面高度（毫米）
+            qr_size_mm: 二维码大小（毫米）
+            x_mm: X坐标（毫米，二维码左上角）
+            y_mm: Y坐标（毫米，二维码左上角）
+        """
+        try:
+            doc = Document()
+            
+            # 设置页面尺寸
+            section = doc.sections[0]
+            section.page_width = Mm(page_width_mm)
+            section.page_height = Mm(page_height_mm)
+            
+            # 设置最小边距
+            section.top_margin = Mm(0)
+            section.bottom_margin = Mm(0)
+            section.left_margin = Mm(0)
+            section.right_margin = Mm(0)
+            
+            # 添加段落（用于定位）
+            paragraph = doc.add_paragraph()
+            
+            # 设置段落格式
+            paragraph.paragraph_format.space_before = Mm(y_mm)
+            paragraph.paragraph_format.left_indent = Mm(x_mm)
+            
+            # 插入二维码图片
+            run = paragraph.add_run()
+            run.add_picture(qr_image_path, width=Mm(qr_size_mm))
+            
+            # 保存Word文档
+            doc.save(word_path)
+            return True
+        except Exception as e:
+            self.log(f"创建Word失败: {str(e)}")
             return False
     
     def generate_index_html(self, directory, uploaded_files, dir_name):
@@ -967,13 +1092,17 @@ class DocumentProcessorApp:
         except Exception as e:
             self.log(f"  复制到error文件夹失败: {str(e)}")
     
-    def process_directory(self, directory, page_size, qr_size_mm, x_mm, y_mm, auto_upload=False, root_dir=None):
+    def process_directory(self, directory, doc_type, page_size, page_width_mm, page_height_mm, 
+                         qr_size_mm, x_mm, y_mm, auto_upload=False, root_dir=None):
         """
-        处理单个目录：上传图片、生成二维码和PDF
+        处理单个目录：上传图片、生成二维码和文档（PDF或Word）
         
         Args:
             directory: 目标目录路径
-            page_size: PDF页面尺寸
+            doc_type: 文档类型（"PDF"或"Word"）
+            page_size: PDF页面尺寸（仅PDF使用）
+            page_width_mm: Word页面宽度（毫米，仅Word使用）
+            page_height_mm: Word页面高度（毫米，仅Word使用）
             qr_size_mm: 二维码大小
             x_mm: 二维码X坐标
             y_mm: 二维码Y坐标
@@ -1046,12 +1175,20 @@ class DocumentProcessorApp:
             if not self.generate_qrcode(oss_url, qr_path, qr_size_mm):
                 return False, "二维码生成失败"
             
-            # 生成PDF
-            pdf_filename = f"{dir_prefix}_qr.pdf"
-            pdf_path = os.path.join(directory, pdf_filename)
-            
-            if not self.create_pdf_with_qrcode(qr_path, pdf_path, page_size, qr_size_mm, x_mm, y_mm):
-                return False, "PDF生成失败"
+            # 根据文档类型生成PDF或Word
+            if doc_type == "PDF":
+                doc_filename = f"{dir_prefix}_qr.pdf"
+                doc_path = os.path.join(directory, doc_filename)
+                
+                if not self.create_pdf_with_qrcode(qr_path, doc_path, page_size, qr_size_mm, x_mm, y_mm):
+                    return False, "PDF生成失败"
+            else:  # Word
+                doc_filename = f"{dir_prefix}_qr.docx"
+                doc_path = os.path.join(directory, doc_filename)
+                
+                if not self.create_word_with_qrcode(qr_path, doc_path, page_width_mm, page_height_mm, 
+                                                    qr_size_mm, x_mm, y_mm):
+                    return False, "Word生成失败"
             
             return True, None
             
@@ -1066,9 +1203,21 @@ class DocumentProcessorApp:
             messagebox.showerror("错误", "请选择有效的根目录")
             return
         
-        page_size = self.get_page_size()
-        if page_size is None:
-            return
+        # 获取文档类型
+        doc_type = self.doc_type_var.get()
+        
+        # 根据文档类型获取页面尺寸
+        if doc_type == "PDF":
+            page_size = self.get_page_size()
+            if page_size is None:
+                return
+            page_width_mm = None
+            page_height_mm = None
+        else:  # Word
+            page_size = None
+            page_width_mm, page_height_mm = self.get_word_page_size()
+            if page_width_mm is None or page_height_mm is None:
+                return
         
         try:
             qr_size_mm = float(self.qr_size_var.get())
@@ -1081,19 +1230,22 @@ class DocumentProcessorApp:
         auto_upload = self.auto_upload_var.get()
         
         if auto_upload and not self.oss_config.is_valid():
+            doc_name = "文档" if doc_type == "Word" else "PDF"
             result = messagebox.askyesno("OSS未配置", 
-                                        "你选择了自动上传，但OSS未配置。\n是否继续（仅生成二维码和PDF）？")
+                                        f"你选择了自动上传，但OSS未配置。\n是否继续（仅生成二维码和{doc_name}）？")
             if not result:
                 return
             auto_upload = False
         
         # 在新线程中处理，避免阻塞GUI
         thread = threading.Thread(target=self.process_all_directories,
-                                 args=(root_dir, page_size, qr_size_mm, x_mm, y_mm, auto_upload))
+                                 args=(root_dir, doc_type, page_size, page_width_mm, page_height_mm, 
+                                       qr_size_mm, x_mm, y_mm, auto_upload))
         thread.daemon = True
         thread.start()
     
-    def process_all_directories(self, root_dir, page_size, qr_size_mm, x_mm, y_mm, auto_upload):
+    def process_all_directories(self, root_dir, doc_type, page_size, page_width_mm, page_height_mm, 
+                                qr_size_mm, x_mm, y_mm, auto_upload):
         """处理所有目录（在后台线程中运行）"""
         try:
             # 禁用按钮
@@ -1105,7 +1257,11 @@ class DocumentProcessorApp:
             self.log("开始处理...")
             self.log(f"根目录: {root_dir}")
             self.log(f"目录类型: {self.dir_type_var.get()}")
-            self.log(f"页面尺寸: {self.page_size_var.get()}")
+            self.log(f"文档类型: {doc_type}")
+            if doc_type == "PDF":
+                self.log(f"页面尺寸: {self.page_size_var.get()}")
+            else:
+                self.log(f"页面尺寸: {self.word_size_var.get()} ({page_width_mm}mm x {page_height_mm}mm)")
             self.log(f"二维码大小: {qr_size_mm}mm")
             self.log(f"二维码位置: ({x_mm}mm, {y_mm}mm)")
             self.log(f"自动上传: {'是' if auto_upload else '否'}")
@@ -1134,7 +1290,9 @@ class DocumentProcessorApp:
                     continue
                 
                 # 处理目录
-                success, error_msg = self.process_directory(target_dir, page_size, qr_size_mm, x_mm, y_mm, auto_upload, root_dir)
+                success, error_msg = self.process_directory(target_dir, doc_type, page_size, page_width_mm, 
+                                                           page_height_mm, qr_size_mm, x_mm, y_mm, 
+                                                           auto_upload, root_dir)
                 
                 if success:
                     self.log(f"✓ 成功: {dir_name}")
