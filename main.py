@@ -351,6 +351,35 @@ class DocumentProcessorApp:
         self.word_height_var = tk.StringVar(value="240")
         ttk.Entry(self.word_custom_size_frame, textvariable=self.word_height_var, width=8).pack(side=tk.LEFT, padx=2)
         
+        # Word页面方向
+        ttk.Label(word_frame, text="页面方向:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.word_orientation_var = tk.StringVar(value="纵向")
+        word_orientation_frame = ttk.Frame(word_frame)
+        word_orientation_frame.grid(row=1, column=1, sticky=tk.W, pady=5)
+        ttk.Radiobutton(word_orientation_frame, text="纵向", variable=self.word_orientation_var, value="纵向").pack(side=tk.LEFT, padx=5)
+        ttk.Radiobutton(word_orientation_frame, text="横向", variable=self.word_orientation_var, value="横向").pack(side=tk.LEFT, padx=5)
+        
+        # Word页边距设置
+        ttk.Label(word_frame, text="页边距(mm):").grid(row=2, column=0, sticky=tk.W, pady=5)
+        word_margin_frame = ttk.Frame(word_frame)
+        word_margin_frame.grid(row=2, column=1, columnspan=5, sticky=tk.W, pady=5)
+        
+        ttk.Label(word_margin_frame, text="上:").pack(side=tk.LEFT, padx=2)
+        self.word_margin_top_var = tk.StringVar(value="0")
+        ttk.Entry(word_margin_frame, textvariable=self.word_margin_top_var, width=6).pack(side=tk.LEFT, padx=2)
+        
+        ttk.Label(word_margin_frame, text="下:").pack(side=tk.LEFT, padx=2)
+        self.word_margin_bottom_var = tk.StringVar(value="0")
+        ttk.Entry(word_margin_frame, textvariable=self.word_margin_bottom_var, width=6).pack(side=tk.LEFT, padx=2)
+        
+        ttk.Label(word_margin_frame, text="左:").pack(side=tk.LEFT, padx=2)
+        self.word_margin_left_var = tk.StringVar(value="0")
+        ttk.Entry(word_margin_frame, textvariable=self.word_margin_left_var, width=6).pack(side=tk.LEFT, padx=2)
+        
+        ttk.Label(word_margin_frame, text="右:").pack(side=tk.LEFT, padx=2)
+        self.word_margin_right_var = tk.StringVar(value="0")
+        ttk.Entry(word_margin_frame, textvariable=self.word_margin_right_var, width=6).pack(side=tk.LEFT, padx=2)
+        
         # 默认隐藏Word设置
         word_frame.grid_remove()
         
@@ -375,8 +404,8 @@ class DocumentProcessorApp:
         ttk.Label(qr_frame, text="Y坐标(mm):").grid(row=1, column=2, sticky=tk.W, pady=5, padx=(20, 0))
         self.qr_y_var = tk.StringVar(value="10")
         ttk.Entry(qr_frame, textvariable=self.qr_y_var, width=10).grid(row=1, column=3, sticky=tk.W, padx=5, pady=5)
-        
-        ttk.Label(qr_frame, text="注：坐标为二维码左下角位置，从页面左下角开始计算", 
+
+        ttk.Label(qr_frame, text="注：pdf坐标为二维码左下角位置，从页面左下角开始计算；Word坐标为二维码左上角位置，从页面左上角开始计算。",
                  foreground="blue").grid(row=2, column=0, columnspan=4, sticky=tk.W, pady=5)
         
         # 操作按钮
@@ -555,26 +584,34 @@ class DocumentProcessorApp:
             return page_size
     
     def get_word_page_size(self):
-        """获取Word页面尺寸（毫米）"""
+        """获取Word页面尺寸（毫米），考虑方向"""
         word_size_name = self.word_size_var.get()
+        orientation = self.word_orientation_var.get()
         
-        # 标准尺寸（毫米）
+        # 标准尺寸（毫米）- 纵向尺寸
         word_sizes = {
-            "A3": (420, 297),
-            "A4": (297, 210),
-            "A5": (210, 148)
+            "A3": (297, 420),
+            "A4": (210, 297),
+            "A5": (148, 210)
         }
         
         if word_size_name == "自定义":
             try:
                 width = float(self.word_width_var.get())
                 height = float(self.word_height_var.get())
+                # 应用方向
+                if orientation == "横向":
+                    width, height = height, width
                 return (width, height)
             except ValueError:
                 messagebox.showerror("错误", "Word自定义尺寸必须是数字")
                 return None, None
         else:
-            return word_sizes[word_size_name]
+            width, height = word_sizes[word_size_name]
+            # 应用方向
+            if orientation == "横向":
+                width, height = height, width
+            return (width, height)
     
     def get_target_directories(self, root_dir, dir_type):
         """
@@ -783,7 +820,9 @@ class DocumentProcessorApp:
             self.log(f"创建PDF失败: {str(e)}")
             return False
     
-    def create_word_with_qrcode(self, qr_image_path, word_path, page_width_mm, page_height_mm, qr_size_mm, x_mm, y_mm):
+    def create_word_with_qrcode(self, qr_image_path, word_path, page_width_mm, page_height_mm, 
+                                qr_size_mm, x_mm, y_mm, margin_top=0, margin_bottom=0, 
+                                margin_left=0, margin_right=0):
         """
         创建Word并插入二维码
         
@@ -795,6 +834,10 @@ class DocumentProcessorApp:
             qr_size_mm: 二维码大小（毫米）
             x_mm: X坐标（毫米，二维码左上角）
             y_mm: Y坐标（毫米，二维码左上角）
+            margin_top: 上边距（毫米）
+            margin_bottom: 下边距（毫米）
+            margin_left: 左边距（毫米）
+            margin_right: 右边距（毫米）
         """
         try:
             doc = Document()
@@ -804,11 +847,11 @@ class DocumentProcessorApp:
             section.page_width = Mm(page_width_mm)
             section.page_height = Mm(page_height_mm)
             
-            # 设置最小边距
-            section.top_margin = Mm(0)
-            section.bottom_margin = Mm(0)
-            section.left_margin = Mm(0)
-            section.right_margin = Mm(0)
+            # 设置页边距
+            section.top_margin = Mm(margin_top)
+            section.bottom_margin = Mm(margin_bottom)
+            section.left_margin = Mm(margin_left)
+            section.right_margin = Mm(margin_right)
             
             # 添加段落（用于定位）
             paragraph = doc.add_paragraph()
@@ -1103,7 +1146,7 @@ class DocumentProcessorApp:
             self.log(f"  复制到error文件夹失败: {str(e)}")
     
     def process_directory(self, directory, doc_type, page_size, page_width_mm, page_height_mm, 
-                         qr_size_mm, x_mm, y_mm, auto_upload=False, root_dir=None):
+                         qr_size_mm, x_mm, y_mm, word_margins=None, auto_upload=False, root_dir=None):
         """
         处理单个目录：上传图片、生成二维码和文档（PDF或Word）
         
@@ -1116,6 +1159,7 @@ class DocumentProcessorApp:
             qr_size_mm: 二维码大小
             x_mm: 二维码X坐标
             y_mm: 二维码Y坐标
+            word_margins: Word页边距元组 (top, bottom, left, right)，仅Word使用
             auto_upload: 是否自动上传
             root_dir: 根目录路径（用于构建OSS路径）
             
@@ -1196,8 +1240,12 @@ class DocumentProcessorApp:
                 doc_filename = f"{dir_prefix}_qr.docx"
                 doc_path = os.path.join(directory, doc_filename)
                 
+                # 解析页边距
+                margin_top, margin_bottom, margin_left, margin_right = word_margins if word_margins else (0, 0, 0, 0)
+                
                 if not self.create_word_with_qrcode(qr_path, doc_path, page_width_mm, page_height_mm, 
-                                                    qr_size_mm, x_mm, y_mm):
+                                                    qr_size_mm, x_mm, y_mm, 
+                                                    margin_top, margin_bottom, margin_left, margin_right):
                     return False, "Word生成失败"
             
             return True, None
@@ -1216,7 +1264,8 @@ class DocumentProcessorApp:
         # 获取文档类型
         doc_type = self.doc_type_var.get()
         
-        # 根据文档类型获取页面尺寸
+        # 根据文档类型获取页面尺寸和页边距
+        word_margins = None
         if doc_type == "PDF":
             page_size = self.get_page_size()
             if page_size is None:
@@ -1227,6 +1276,17 @@ class DocumentProcessorApp:
             page_size = None
             page_width_mm, page_height_mm = self.get_word_page_size()
             if page_width_mm is None or page_height_mm is None:
+                return
+            
+            # 获取Word页边距
+            try:
+                margin_top = float(self.word_margin_top_var.get())
+                margin_bottom = float(self.word_margin_bottom_var.get())
+                margin_left = float(self.word_margin_left_var.get())
+                margin_right = float(self.word_margin_right_var.get())
+                word_margins = (margin_top, margin_bottom, margin_left, margin_right)
+            except ValueError:
+                messagebox.showerror("错误", "Word页边距必须是数字")
                 return
         
         try:
@@ -1250,12 +1310,12 @@ class DocumentProcessorApp:
         # 在新线程中处理，避免阻塞GUI
         thread = threading.Thread(target=self.process_all_directories,
                                  args=(root_dir, doc_type, page_size, page_width_mm, page_height_mm, 
-                                       qr_size_mm, x_mm, y_mm, auto_upload))
+                                       qr_size_mm, x_mm, y_mm, word_margins, auto_upload))
         thread.daemon = True
         thread.start()
     
     def process_all_directories(self, root_dir, doc_type, page_size, page_width_mm, page_height_mm, 
-                                qr_size_mm, x_mm, y_mm, auto_upload):
+                                qr_size_mm, x_mm, y_mm, word_margins, auto_upload):
         """处理所有目录（在后台线程中运行）"""
         try:
             # 禁用按钮
@@ -1302,7 +1362,7 @@ class DocumentProcessorApp:
                 # 处理目录
                 success, error_msg = self.process_directory(target_dir, doc_type, page_size, page_width_mm, 
                                                            page_height_mm, qr_size_mm, x_mm, y_mm, 
-                                                           auto_upload, root_dir)
+                                                           word_margins, auto_upload, root_dir)
                 
                 if success:
                     self.log(f"✓ 成功: {dir_name}")

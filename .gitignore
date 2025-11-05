@@ -19,8 +19,9 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.cloudbase/*
 
-西沟乡麻地沟村（资料扫描）/
+西沟乡麻地沟村（资料扫描）/*
 
 # Virtual Environment
 .venv/
