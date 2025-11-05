@@ -222,31 +222,26 @@ class DocumentProcessorApp:
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
+        # 第一行：目录设置和OSS设置
+        first_row_container = ttk.Frame(main_frame)
+        first_row_container.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        first_row_container.columnconfigure(0, weight=1)
+        first_row_container.columnconfigure(1, weight=1)
+        
         # 目录选择
-        dir_frame = ttk.LabelFrame(main_frame, text="目录设置", padding="10")
-        dir_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        dir_frame = ttk.LabelFrame(first_row_container, text="目录设置", padding="10")
+        dir_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
         
         ttk.Label(dir_frame, text="根目录:").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.root_dir_var = tk.StringVar()
         # 监听路径变化
         self.root_dir_var.trace_add('write', self.on_directory_changed)
-        ttk.Entry(dir_frame, textvariable=self.root_dir_var, width=50).grid(row=0, column=1, padx=5, pady=5)
+        ttk.Entry(dir_frame, textvariable=self.root_dir_var, width=35).grid(row=0, column=1, padx=5, pady=5)
         ttk.Button(dir_frame, text="浏览...", command=self.browse_directory).grid(row=0, column=2, padx=5, pady=5)
         
-        # 目录结构类型（自动检测）
-        ttk.Label(dir_frame, text="目录结构:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.dir_type_var = tk.StringVar(value="未检测")
-        self.dir_type_label = ttk.Label(dir_frame, textvariable=self.dir_type_var, foreground="blue")
-        self.dir_type_label.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
-        # ttk.Label(dir_frame, text="（自动检测）", foreground="gray").grid(row=1, column=2, sticky=tk.W, pady=5)
-        
-        # 创建横向容器放置OSS设置
-        settings_container = ttk.Frame(main_frame)
-        settings_container.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
-        
         # OSS设置
-        oss_frame = ttk.LabelFrame(settings_container, text="OSS设置", padding="10")
-        oss_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
+        oss_frame = ttk.LabelFrame(first_row_container, text="OSS设置", padding="10")
+        oss_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(5, 0))
         
         oss_button_frame = ttk.Frame(oss_frame)
         oss_button_frame.grid(row=0, column=0, sticky=tk.W)
@@ -261,6 +256,31 @@ class DocumentProcessorApp:
         self.auto_upload_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(oss_frame, text="生成二维码后自动上传图片到OSS", 
                        variable=self.auto_upload_var).grid(row=1, column=0, sticky=tk.W, pady=5)
+        
+        # 第二行：目录结构和进度
+        second_row_container = ttk.Frame(main_frame)
+        second_row_container.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        second_row_container.columnconfigure(0, weight=1)
+        second_row_container.columnconfigure(1, weight=1)
+        
+        # 目录结构显示
+        dir_type_frame = ttk.LabelFrame(second_row_container, text="目录结构", padding="10")
+        dir_type_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
+        
+        ttk.Label(dir_type_frame, text="检测结果:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.dir_type_var = tk.StringVar(value="未检测")
+        self.dir_type_label = ttk.Label(dir_type_frame, textvariable=self.dir_type_var, foreground="blue")
+        self.dir_type_label.grid(row=0, column=1, sticky=tk.W, pady=5, padx=5)
+        
+        # 进度显示
+        progress_frame = ttk.LabelFrame(second_row_container, text="进度", padding="10")
+        progress_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(5, 0))
+        
+        self.progress_var = tk.StringVar(value="就绪")
+        ttk.Label(progress_frame, textvariable=self.progress_var).pack(anchor=tk.W)
+        
+        self.progress_bar = ttk.Progressbar(progress_frame, mode='indeterminate')
+        self.progress_bar.pack(fill=tk.X, pady=5)
         
         # 文档类型选择
         doc_type_frame = ttk.LabelFrame(main_frame, text="文档类型", padding="10")
@@ -368,19 +388,9 @@ class DocumentProcessorApp:
         
         ttk.Button(button_frame, text="清除日志", command=self.clear_log, width=15).pack(side=tk.LEFT, padx=5)
         
-        # 进度显示
-        progress_frame = ttk.LabelFrame(main_frame, text="进度", padding="10")
-        progress_frame.grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
-        
-        self.progress_var = tk.StringVar(value="就绪")
-        ttk.Label(progress_frame, textvariable=self.progress_var).pack(anchor=tk.W)
-        
-        self.progress_bar = ttk.Progressbar(progress_frame, mode='indeterminate')
-        self.progress_bar.pack(fill=tk.X, pady=5)
-        
         # 日志显示
         log_frame = ttk.LabelFrame(main_frame, text="处理日志", padding="10")
-        log_frame.grid(row=8, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        log_frame.grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
         
         self.log_text = scrolledtext.ScrolledText(log_frame, height=15, width=100)
         self.log_text.pack(fill=tk.BOTH, expand=True)
@@ -389,7 +399,7 @@ class DocumentProcessorApp:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
-        main_frame.rowconfigure(6, weight=1)
+        main_frame.rowconfigure(7, weight=1)
         
     def update_oss_status(self):
         """更新OSS状态显示"""
