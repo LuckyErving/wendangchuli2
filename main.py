@@ -27,8 +27,8 @@ from docx.shared import Mm
 
 def chinese_to_pinyin_initials(text):
     """
-    将中文转换为拼音首字母，保留英文、数字和部分符号
-    使用pypinyin库自动转换所有中文字符
+    将中文转换为完整拼音，保留英文、数字和部分符号
+    使用pypinyin库自动转换所有中文字符（使用完整拼音避免重复）
     
     Args:
         text: 输入文本
@@ -39,8 +39,8 @@ def chinese_to_pinyin_initials(text):
     result = []
     for char in text:
         if '\u4e00' <= char <= '\u9fff':  # 中文字符
-            # 使用pypinyin获取首字母
-            pinyin = lazy_pinyin(char, style=Style.FIRST_LETTER)
+            # 使用pypinyin获取完整拼音（不带声调）
+            pinyin = lazy_pinyin(char, style=Style.NORMAL)
             if pinyin:
                 result.append(pinyin[0].lower())
             else:
@@ -58,7 +58,7 @@ def chinese_to_pinyin_initials(text):
 
 def convert_path_to_pinyin(path):
     """
-    将路径中的中文部分转换为拼音首字母
+    将路径中的中文部分转换为完整拼音
     
     Args:
         path: 文件路径
