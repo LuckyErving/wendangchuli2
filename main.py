@@ -741,7 +741,7 @@ class DocumentProcessorApp:
 
     def generate_qrcode(self, url, output_path, size_mm=50):
         """
-        生成二维码图片（优化后更小）
+        生成二维码图片（优化版：更少格子，更高清晰度）
         
         Args:
             url: 二维码内容（URL）
@@ -749,22 +749,26 @@ class DocumentProcessorApp:
             size_mm: 二维码大小（毫米）
         """
         try:
-            # 将毫米转换为像素（假设300 DPI）
-            dpi = 300
+            # 使用更高的DPI以保证清晰度（600 DPI）
+            dpi = 600
             size_px = int(size_mm * dpi / 25.4)
 
-            # 先以最小box_size生成二维码矩阵，再根据目标像素计算最优box_size
-            border = 1  # 最小安全边框
+            # 使用最小边框（0边框在某些扫描器上可能有问题，使用1是安全的最小值）
+            border = 1
+            
+            # 创建二维码对象，使用最优配置
             qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=1,
-                border=border,
+                version=1,  # 从版本1开始，会自动调整
+                error_correction=qrcode.constants.ERROR_CORRECT_L,  # 最低纠错级别（7%），格子数最少
+                box_size=1,  # 初始box_size
+                border=border,  # 最小边框
             )
+            
+            # 添加数据并自动优化版本
             qr.add_data(url)
-            qr.make(fit=True)
+            qr.make(fit=True)  # 自动选择最小的版本号
 
-            # 获取模块数量（每边的模块数）
+            # 获取实际模块数量
             modules = getattr(qr, 'modules_count', None)
             if modules is None:
                 try:
@@ -772,20 +776,23 @@ class DocumentProcessorApp:
                 except Exception:
                     modules = 21
 
-            # 计算合适的box_size，使得生成时模块尽可能小
-            # 保证至少为1像素
-            box_size = max(1, size_px // (modules + 2 * border))
+            # 计算最优box_size以达到目标像素大小
+            # 每个模块至少4像素以保证清晰度
+            min_box_size = 4
+            box_size = max(min_box_size, size_px // (modules + 2 * border))
 
-            # 使用计算出的box_size生成图像
+            # 重新设置box_size生成高清图像
             qr.box_size = box_size
             img = qr.make_image(fill_color="black", back_color="white")
 
-            # 如果生成的尺寸与目标尺寸不同，使用最近邻插值放缩以保持模块清晰
+            # 如果生成的尺寸与目标尺寸不同，使用LANCZOS算法缩放以保持清晰度
             final_w = img.size[0]
             if final_w != size_px:
-                img = img.resize((size_px, size_px), resample=Image.Resampling.NEAREST)
+                # 使用高质量的LANCZOS重采样算法
+                img = img.resize((size_px, size_px), resample=Image.Resampling.LANCZOS)
 
-            img.save(output_path)
+            # 保存为高质量PNG（无损压缩）
+            img.save(output_path, optimize=True)
             return True
         except Exception as e:
             self.log(f"生成二维码失败: {str(e)}")
@@ -1064,14 +1071,15 @@ class DocumentProcessorApp:
             self.log("  OSS未配置，跳过上传")
             return False, None
         
-        # 构建OSS路径：包含根目录名称和子目录名称，并转换为拼音首字母
+        # 构建OSS路径：包含根目录名称和子目录名称，统一使用m.jpg作为文件名
         if root_dir:
             root_name = os.path.basename(root_dir)
             dir_name = os.path.basename(directory)
-            oss_path = f"{root_name}/{dir_name}/{os.path.basename(merged_image_path)}"
+            # 统一使用m.jpg作为文件名
+            oss_path = f"{root_name}/{dir_name}/m.jpg"
         else:
             dir_name = os.path.basename(directory)
-            oss_path = f"{dir_name}/{os.path.basename(merged_image_path)}"
+            oss_path = f"{dir_name}/m.jpg"
         
         # 将OSS路径中的中文转换为拼音首字母
         pinyin_oss_path = convert_path_to_pinyin(oss_path)
@@ -1175,8 +1183,8 @@ class DocumentProcessorApp:
             if not images:
                 return True, None  # 无图片不算错误
             
-            # 合并图片
-            merged_filename = f"{dir_prefix}_merged.jpg"
+            # 合并图片 - 统一使用简短文件名
+            merged_filename = "m.jpg"
             merged_path = os.path.join(directory, merged_filename)
             
             if not self.merge_images_horizontally(images, merged_path):
@@ -1195,20 +1203,20 @@ class DocumentProcessorApp:
                 if self.oss_config.is_valid():
                     endpoint_without_protocol = self.oss_config.endpoint.replace('http://', '').replace('https://', '')
                     
-                    # 构建OSS路径
+                    # 构建OSS路径 - 统一使用m.jpg作为文件名
                     if root_dir:
                         root_name = os.path.basename(root_dir)
                         # 计算相对路径
                         if directory.startswith(root_dir):
                             rel_path = os.path.relpath(directory, root_dir)
                             if rel_path == '.':
-                                oss_path = f"{root_name}/{merged_filename}"
+                                oss_path = f"{root_name}/m.jpg"
                             else:
-                                oss_path = f"{root_name}/{rel_path}/{merged_filename}"
+                                oss_path = f"{root_name}/{rel_path}/m.jpg"
                         else:
-                            oss_path = f"{dir_name}/{merged_filename}"
+                            oss_path = f"{dir_name}/m.jpg"
                     else:
-                        oss_path = f"{dir_name}/{merged_filename}"
+                        oss_path = f"{dir_name}/m.jpg"
                     
                     # 将路径中的中文转换为拼音首字母
                     pinyin_path = convert_path_to_pinyin(oss_path)

@@ -43,8 +43,12 @@ test_output/
 *.log
 
 # Generated files (避免将生成的二维码和PDF提交到git)
+*.jpg
 *_qr.png
 *_qr.pdf
+*_qr.docx
+m.jpg
+*_merged.jpg
 
 # OSS配置文件（包含敏感信息）
 oss_config.json
